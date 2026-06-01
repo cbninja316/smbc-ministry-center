@@ -1,0 +1,34 @@
+# ── .NET / C# ──────────────────────────────────────────────────────
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.swp
+
+# Secrets — never commit production appsettings
+backend/SmbcStatusBoard.Api/appsettings.json
+
+# SQLite database (contains live church data)
+*.db
+*.db-shm
+*.db-wal
+
+# Receipt image storage
+backend/SmbcStatusBoard.Api/Storage/
+
+# .NET user secrets
+**/secrets.json
+
+# ── Node / Frontend ─────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+
+# ── macOS ────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+
+# ── IDE ──────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.code-workspace
