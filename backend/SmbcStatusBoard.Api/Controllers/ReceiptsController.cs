@@ -18,7 +18,7 @@ public class ReceiptsController(AppDbContext db, FileStorageService storage) : C
     {
         var receipts = await db.Receipts
             .OrderByDescending(r => r.Date)
-            .Select(r => new ReceiptResponse(r.Id, r.Date, r.Ministry, r.Description, r.Amount, r.SubmittedBy))
+            .Select(r => new ReceiptResponse(r.Id, r.Date, r.Ministry, r.Description, r.Amount, r.SubmittedBy, r.IsDone))
             .ToListAsync();
 
         return Ok(receipts);
@@ -51,7 +51,17 @@ public class ReceiptsController(AppDbContext db, FileStorageService storage) : C
         await db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetAll), new { id = receipt.Id },
-            new ReceiptResponse(receipt.Id, receipt.Date, receipt.Ministry, receipt.Description, receipt.Amount, receipt.SubmittedBy));
+            new ReceiptResponse(receipt.Id, receipt.Date, receipt.Ministry, receipt.Description, receipt.Amount, receipt.SubmittedBy, false));
+    }
+
+    [HttpPatch("{id}/done")]
+    public async Task<IActionResult> MarkDone(int id)
+    {
+        var receipt = await db.Receipts.FindAsync(id);
+        if (receipt is null) return NotFound();
+        receipt.IsDone = true;
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Receipt marked as done." });
     }
 
     [HttpGet("{id}/image")]

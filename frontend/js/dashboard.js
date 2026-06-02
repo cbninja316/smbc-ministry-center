@@ -199,36 +199,64 @@ COLUMNS.forEach(status => {
 
 // ── Receipts ──────────────────────────────────────────────────────────────────
 
-function renderReceipts(all = false) {
+function renderReceipts() {
   const section = document.getElementById('receipts-section');
   if (!canAccess('Receipt')) { section.classList.add('hidden'); return; }
 
-  const data = all ? allReceipts : allReceipts.slice(0, PREVIEW_LIMIT);
+  const active = allReceipts.filter(r => !r.isDone);
+  const done   = allReceipts.filter(r => r.isDone);
+
+  // ── Active receipts (all, no pagination) ──
   const tbody = document.getElementById('receipts-body');
   tbody.innerHTML = '';
+  active.forEach(r => tbody.appendChild(buildReceiptRow(r, false)));
+  document.getElementById('receipts-view-more').classList.add('hidden');
 
-  data.forEach(r => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${new Date(r.date).toLocaleDateString('en-US')}</td>
-      <td>${escHtml(r.ministry)}</td>
-      <td>${escHtml(r.description)}</td>
-      <td>$${parseFloat(r.amount).toFixed(2)}</td>
-      <td>${escHtml(r.submittedBy)}</td>
-      <td><button class="receipt-view-link">View</button></td>
-    `;
-    tr.querySelector('button').addEventListener('click', () => openReceiptModal(r.id));
-    tbody.appendChild(tr);
-  });
+  // ── Done receipts section ──
+  const doneSection = document.getElementById('receipts-done-section');
+  const doneTbody   = document.getElementById('receipts-done-body');
+  doneTbody.innerHTML = '';
 
-  const viewMore = document.getElementById('receipts-view-more');
-  if (!all && allReceipts.length > PREVIEW_LIMIT) {
-    viewMore.textContent = `View More (${allReceipts.length - PREVIEW_LIMIT})`;
-    viewMore.classList.remove('hidden');
-    viewMore.onclick = () => { renderReceipts(true); viewMore.classList.add('hidden'); };
+  if (done.length > 0) {
+    doneSection.classList.remove('hidden');
+    done.forEach(r => doneTbody.appendChild(buildReceiptRow(r, true)));
   } else {
-    viewMore.classList.add('hidden');
+    doneSection.classList.add('hidden');
   }
+}
+
+function buildReceiptRow(r, isDone) {
+  const tr = document.createElement('tr');
+  if (isDone) tr.style.opacity = '0.6';
+
+  tr.innerHTML = `
+    <td>${new Date(r.date).toLocaleDateString('en-US')}</td>
+    <td>${escHtml(r.ministry)}</td>
+    <td>${escHtml(r.description)}</td>
+    <td>$${parseFloat(r.amount).toFixed(2)}</td>
+    <td>${escHtml(r.submittedBy)}</td>
+    <td style="display:flex;gap:8px;align-items:center;">
+      <button class="receipt-view-link">View</button>
+      ${!isDone ? `<button class="receipt-done-btn">Done</button>` : ''}
+    </td>
+  `;
+
+  tr.querySelector('.receipt-view-link').addEventListener('click', () => openReceiptModal(r.id));
+
+  if (!isDone) {
+    tr.querySelector('.receipt-done-btn').addEventListener('click', async () => {
+      try {
+        await Receipts.markDone(r.id);
+        const idx = allReceipts.findIndex(rec => rec.id === r.id);
+        if (idx !== -1) allReceipts[idx].isDone = true;
+        renderReceipts();
+      } catch (e) {
+        console.error('Failed to mark receipt done:', e);
+      }
+    });
+  }
+
+  return tr;
 }
 
 // ── Add receipt modal ─────────────────────────────────────────────────────────

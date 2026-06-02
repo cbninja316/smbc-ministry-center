@@ -332,12 +332,46 @@ body {
   color: var(--primary);
   font-weight: 600;
   cursor: pointer;
-  background: none;
-  border: none;
-  font-size: 0.9rem;
-  padding: 0;
+  background: none !important;
+  border: none !important;
+  font-size: 0.9rem !important;
+  padding: 0 !important;
+  box-shadow: none !important;
 }
-.receipt-view-link:hover { text-decoration: underline; }
+.receipt-view-link:hover { text-decoration: underline; color: var(--primary) !important; }
+
+.receipt-done-btn {
+  color: #065f46;
+  font-weight: 600;
+  cursor: pointer;
+  background: #d1fae5 !important;
+  border: none !important;
+  font-size: 0.82rem !important;
+  padding: 3px 10px !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+.receipt-done-btn:hover { background: #a7f3d0 !important; }
+
+/* ── Done receipts sub-section ── */
+.receipts-done-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 28px 0 14px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.receipts-done-header::before,
+.receipts-done-header::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
 
 /* ── Modal ── */
 .modal-overlay {

@@ -64,5 +64,6 @@ public record ReceiptResponse(
     string Ministry,
     string Description,
     decimal Amount,
-    string SubmittedBy
+    string SubmittedBy,
+    bool IsDone
 );
