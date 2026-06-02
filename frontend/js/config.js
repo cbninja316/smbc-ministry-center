@@ -16,5 +16,6 @@ const SMBC_CONFIG = {
     dashboard:      '/index.html',
     setupPassword:  '/setup-password.html',
     users:          '/users.html',
+    submit:         '/submit.html',
   }
 };
