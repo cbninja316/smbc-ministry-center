@@ -544,32 +544,33 @@ body {
   gap: 0 16px;
 }
 
-/* ── Checkbox rows — absolute positioning beats Astra float/flex overrides ── */
+/* ── Checkbox rows — CSS Grid placement wins even if Astra overrides child display ── */
 .check-wrap {
-  display: block !important;
-  position: relative !important;
-  padding-left: 26px !important;
-  min-height: 20px !important;
-  line-height: 20px !important;
+  display: grid !important;
+  grid-template-columns: 16px 1fr !important;
+  grid-template-rows: auto !important;
+  align-items: center !important;
+  column-gap: 9px !important;
   cursor: pointer;
   margin: 0 !important;
+  padding: 0 !important;
 }
 .check-wrap input[type="checkbox"],
 .check-wrap input[type="radio"] {
-  position: absolute !important;
-  left: 0 !important;
-  top: 2px !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
   width: 16px !important;
   height: 16px !important;
   float: none !important;
   margin: 0 !important;
   padding: 0 !important;
-  cursor: pointer;
+  justify-self: center !important;
+  align-self: center !important;
 }
 .check-wrap label {
-  display: inline !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
   float: none !important;
-  position: static !important;
   margin: 0 !important;
   padding: 0 !important;
   font-weight: 400 !important;
