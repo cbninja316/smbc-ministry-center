@@ -647,8 +647,12 @@ function openReceiptModal(receiptId) {
   const container = overlay.querySelector('#receipt-image-container');
 
   fetch(Receipts.imageUrl(receiptId), {
-    headers: { Authorization: `Bearer ${getToken()}` }
+    headers: {
+      'Authorization': `Bearer ${getToken()}`,
+      'ngrok-skip-browser-warning': 'true',
+    }
   }).then(async res => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const contentType = res.headers.get('Content-Type') || '';
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
