@@ -4,14 +4,8 @@ let currentType = 'ChurchEvent';
 
 // ── Type selector ─────────────────────────────────────────────────────────────
 
-document.querySelectorAll('.submit-type-btn').forEach(btn => {
-  btn.addEventListener('click', () => selectType(btn.dataset.type));
-});
-
 function selectType(type) {
   currentType = type;
-  document.querySelectorAll('.submit-type-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.type === type));
   document.querySelectorAll('.submit-form-section').forEach(s =>
     s.classList.add('hidden'));
   document.getElementById(`form-${type}`).classList.remove('hidden');

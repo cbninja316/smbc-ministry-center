@@ -13,52 +13,27 @@
   </nav>
 
   <div class="dashboard">
-    <div class="section-card">
-      <h2 style="margin-bottom:8px;">Submit a Request</h2>
-      <p class="submit-notice">
+    <div class="section-card" style="max-width:760px;margin:0 auto 24px;">
+
+      <h2 style="margin-bottom:10px;">Submit a Request</h2>
+      <p style="color:var(--text-muted);font-size:0.92rem;margin-bottom:28px;line-height:1.6;">
         Use this form to submit church event requests, facility use requests, benevolence requests,
         maintenance reports, or receipts. All submissions go directly to church staff.
       </p>
 
-      <!-- ── Type selector ─────────────────────────────────────────── -->
-      <div class="submit-type-grid">
-
-        <button class="submit-type-btn active" data-type="ChurchEvent">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          Church Event
-        </button>
-
-        <button class="submit-type-btn" data-type="FacilityUse">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          Facility Use
-        </button>
-
-        <button class="submit-type-btn" data-type="Benevolence">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-          Benevolence
-        </button>
-
-        <button class="submit-type-btn" data-type="Maintenance">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-          </svg>
-          Maintenance
-        </button>
-
-        <button class="submit-type-btn" data-type="Receipt">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-          </svg>
-          Receipt
-        </button>
-
+      <!-- ── Type dropdown ─────────────────────────────────────────── -->
+      <div class="field" style="margin-bottom:0;">
+        <label style="font-size:0.95rem;">Request Type</label>
+        <select id="request-type" style="font-size:1rem;padding:12px 16px;">
+          <option value="ChurchEvent">Church Event</option>
+          <option value="FacilityUse">Facility Use Request</option>
+          <option value="Benevolence">Benevolence Request</option>
+          <option value="Maintenance">Maintenance Request</option>
+          <option value="Receipt">Receipt Submission</option>
+        </select>
       </div>
+
+      <hr class="submit-divider">
 
       <!-- ── Church Event Form ─────────────────────────────────────── -->
       <div id="form-ChurchEvent" class="submit-form-section">
@@ -97,9 +72,9 @@
           </div>
         </div>
         <div class="field">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
-            <input type="checkbox" id="ce-registration" style="width:16px;height:16px;">
-            <span style="font-weight:600;font-size:0.85rem;color:var(--secondary);">Registration Required</span>
+          <label class="check-label">
+            <input type="checkbox" id="ce-registration">
+            Registration Required
           </label>
         </div>
         <div class="field">
@@ -107,24 +82,12 @@
           <textarea id="ce-description" rows="4" placeholder="Describe the event, purpose, and any special needs..."></textarea>
         </div>
         <div class="field">
-          <label>Promotion Needed</label>
-          <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
-            <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
-              <input type="checkbox" id="ce-promo-fb" style="width:16px;height:16px;">
-              Post on Church Facebook Page
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
-              <input type="checkbox" id="ce-promo-fb-event" style="width:16px;height:16px;">
-              Create Facebook Event
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
-              <input type="checkbox" id="ce-promo-text" style="width:16px;height:16px;">
-              Text Message Alert
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
-              <input type="checkbox" id="ce-promo-email" style="width:16px;height:16px;">
-              Email Newsletter
-            </label>
+          <label style="display:block;margin-bottom:10px;">Promotion Needed</label>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <label class="check-label"><input type="checkbox" id="ce-promo-fb"> Post on Church Facebook Page</label>
+            <label class="check-label"><input type="checkbox" id="ce-promo-fb-event"> Create Facebook Event</label>
+            <label class="check-label"><input type="checkbox" id="ce-promo-text"> Text Message Alert</label>
+            <label class="check-label"><input type="checkbox" id="ce-promo-email"> Email Newsletter</label>
           </div>
         </div>
       </div>
@@ -157,7 +120,6 @@
           All information provided is kept strictly confidential. Requests are reviewed by the
           Benevolence Committee. Submitting this form does not guarantee assistance will be provided.
         </div>
-
         <div class="form-row">
           <div class="field">
             <label>Full Name <span style="color:#dc2626">*</span></label>
@@ -177,14 +139,16 @@
             <label>City</label>
             <input type="text" id="bn-city" placeholder="Moore">
           </div>
-          <div class="field" style="display:grid;grid-template-columns:1fr 2fr;gap:0 12px;">
-            <div>
-              <label>State</label>
-              <input type="text" id="bn-state" placeholder="OK" maxlength="2">
-            </div>
-            <div>
-              <label>Zip Code</label>
-              <input type="text" id="bn-zip" placeholder="73160">
+          <div class="field">
+            <div class="form-row" style="gap:0 12px;">
+              <div>
+                <label>State</label>
+                <input type="text" id="bn-state" placeholder="OK" maxlength="2">
+              </div>
+              <div>
+                <label>Zip Code</label>
+                <input type="text" id="bn-zip" placeholder="73160">
+              </div>
             </div>
           </div>
         </div>
@@ -206,9 +170,8 @@
           <label>Reason for Request <span style="color:#dc2626">*</span></label>
           <textarea id="bn-description" rows="4" placeholder="Please describe your need and how the assistance will be used..."></textarea>
         </div>
-
         <div class="benev-section">
-          <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5;">
+          <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">
             By signing below, I certify that the information provided is true and accurate to the best of my knowledge.
             I understand that any assistance provided is a gift from the church and is not a loan.
           </p>
@@ -286,16 +249,16 @@
         <div class="field">
           <label>Receipt Image <span style="color:#dc2626">*</span></label>
           <input type="file" id="rc-image" accept="image/jpeg,image/png,image/webp,application/pdf"
-            style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;width:100%;font-size:0.9rem;cursor:pointer;background:#fff;">
-          <div id="rc-preview" style="margin-top:10px;display:none;">
-            <img id="rc-preview-img" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm);border:1.5px solid var(--border);">
+            style="border:1.5px solid var(--border) !important;border-radius:var(--radius-sm) !important;padding:10px 14px !important;width:100% !important;font-size:0.9rem !important;cursor:pointer;background:#fff !important;box-shadow:none !important;">
+          <div id="rc-preview" style="margin-top:12px;display:none;">
+            <img id="rc-preview-img" style="max-width:100%;max-height:220px;border-radius:var(--radius-sm);border:1.5px solid var(--border);">
           </div>
         </div>
       </div>
 
       <!-- ── Submit button ─────────────────────────────────────────── -->
-      <div style="margin-top:32px;">
-        <button class="btn btn-primary btn-full" id="submit-btn" style="font-size:1rem;padding:14px;">
+      <div style="margin-top:8px;">
+        <button class="btn btn-primary btn-full" id="submit-btn" style="font-size:1rem;padding:15px;">
           Submit Request
         </button>
       </div>
@@ -306,7 +269,10 @@
   <script src="js/config.js"></script>
   <script src="js/submit.js"></script>
   <script>
-    // Receipt image preview
+    document.getElementById('request-type').addEventListener('change', function() {
+      selectType(this.value);
+    });
+
     document.getElementById('rc-image').addEventListener('change', function() {
       const file = this.files[0];
       if (!file || file.type === 'application/pdf') return;
@@ -318,7 +284,6 @@
       reader.readAsDataURL(file);
     });
 
-    // Default signature date to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('bn-sigdate').value = today;
     document.getElementById('rc-date').value = today;
