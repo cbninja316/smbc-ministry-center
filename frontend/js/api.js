@@ -10,9 +10,15 @@ async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
   if (res.status === 401) {
-    localStorage.clear();
-    window.location.href = _page('login');
-    return;
+    if (getToken()) {
+      // Existing session expired — clear and redirect to login
+      localStorage.clear();
+      window.location.href = _page('login');
+      return;
+    }
+    // No token means this is a login attempt with wrong credentials
+    const err = await res.json().catch(() => ({ message: 'Invalid username or password.' }));
+    throw new Error(err.message || 'Invalid username or password.');
   }
 
   if (!res.ok) {
