@@ -83,10 +83,10 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
           </div>
         </div>
         <div class="field">
-          <label class="check-label">
+          <div class="check-wrap">
             <input type="checkbox" id="ce-registration">
-            Registration Required
-          </label>
+            <label for="ce-registration">Registration Required</label>
+          </div>
         </div>
         <div class="field">
           <label>Event Description <span style="color:#dc2626">*</span></label>
@@ -95,10 +95,10 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
         <div class="field">
           <label style="display:block !important;margin-bottom:10px;">Promotion Needed</label>
           <div style="display:flex;flex-direction:column;gap:12px;">
-            <label class="check-label"><input type="checkbox" id="ce-promo-fb"> Post on Church Facebook Page</label>
-            <label class="check-label"><input type="checkbox" id="ce-promo-fb-event"> Create Facebook Event</label>
-            <label class="check-label"><input type="checkbox" id="ce-promo-text"> Text Message Alert</label>
-            <label class="check-label"><input type="checkbox" id="ce-promo-email"> Email Newsletter</label>
+            <div class="check-wrap"><input type="checkbox" id="ce-promo-fb"><label for="ce-promo-fb">Post on Church Facebook Page</label></div>
+            <div class="check-wrap"><input type="checkbox" id="ce-promo-fb-event"><label for="ce-promo-fb-event">Create Facebook Event</label></div>
+            <div class="check-wrap"><input type="checkbox" id="ce-promo-text"><label for="ce-promo-text">Text Message Alert</label></div>
+            <div class="check-wrap"><input type="checkbox" id="ce-promo-email"><label for="ce-promo-email">Email Newsletter</label></div>
           </div>
         </div>
       </div>
