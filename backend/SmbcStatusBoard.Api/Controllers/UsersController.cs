@@ -65,8 +65,10 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         db.InviteTokens.Add(invite);
         await db.SaveChangesAsync();
 
-        var frontendUrl = config["App:FrontendUrl"];
-        var inviteLink = $"{frontendUrl}/setup-password.html?token={token}";
+        // Use SiteUrl (always the real WordPress URL) for invite links.
+        // FrontendUrl may be "*" in dev which is only used for CORS.
+        var siteUrl = config["App:SiteUrl"] ?? config["App:FrontendUrl"];
+        var inviteLink = $"{siteUrl}/smbc-setup-password/?token={token}";
 
         await emailService.SendInviteAsync(user.Email, user.Username, inviteLink);
 
