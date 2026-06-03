@@ -213,13 +213,27 @@ function renderReceipts() {
   document.getElementById('receipts-view-more').classList.add('hidden');
 
   // ── Done receipts section ──
-  const doneSection = document.getElementById('receipts-done-section');
-  const doneTbody   = document.getElementById('receipts-done-body');
-  doneTbody.innerHTML = '';
+  const doneSection    = document.getElementById('receipts-done-section');
+  const doneTbody      = document.getElementById('receipts-done-body');
+  const doneViewMore   = document.getElementById('receipts-done-view-more');
+  doneTbody.innerHTML  = '';
 
   if (done.length > 0) {
     doneSection.classList.remove('hidden');
-    done.forEach(r => doneTbody.appendChild(buildReceiptRow(r, true)));
+    const showAll = doneSection.dataset.expanded === 'true';
+    const visible = showAll ? done : done.slice(0, 2);
+    visible.forEach(r => doneTbody.appendChild(buildReceiptRow(r, true)));
+
+    if (done.length > 2) {
+      doneViewMore.classList.remove('hidden');
+      doneViewMore.textContent = showAll ? 'Show Less' : `View More (${done.length - 2} more)`;
+      doneViewMore.onclick = () => {
+        doneSection.dataset.expanded = showAll ? 'false' : 'true';
+        renderReceipts();
+      };
+    } else {
+      doneViewMore.classList.add('hidden');
+    }
   } else {
     doneSection.classList.add('hidden');
   }
@@ -238,6 +252,7 @@ function buildReceiptRow(r, isDone) {
     <td style="display:flex;gap:8px;align-items:center;">
       <button class="receipt-view-link">View</button>
       ${!isDone ? `<button class="receipt-done-btn">Done</button>` : ''}
+      ${isDone ? `<button class="receipt-delete-btn" style="color:#c0392b;">Delete</button>` : ''}
     </td>
   `;
 
@@ -252,6 +267,19 @@ function buildReceiptRow(r, isDone) {
         renderReceipts();
       } catch (e) {
         console.error('Failed to mark receipt done:', e);
+      }
+    });
+  }
+
+  if (isDone) {
+    tr.querySelector('.receipt-delete-btn').addEventListener('click', async () => {
+      if (!confirm('Delete this receipt and its image permanently?')) return;
+      try {
+        await Receipts.delete(r.id);
+        allReceipts = allReceipts.filter(rec => rec.id !== r.id);
+        renderReceipts();
+      } catch (e) {
+        console.error('Failed to delete receipt:', e);
       }
     });
   }

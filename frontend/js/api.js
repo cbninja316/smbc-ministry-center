@@ -73,6 +73,7 @@ const Receipts = {
   getAll: () => apiFetch('/receipts'),
   create: (formData) => apiUpload('/receipts', formData),
   markDone: (id) => apiFetch(`/receipts/${id}/done`, { method: 'PATCH' }),
+  delete: (id) => apiFetch(`/receipts/${id}`, { method: 'DELETE' }),
   imageUrl: (id) => `${API_BASE}/receipts/${id}/image`,
 };
 

@@ -158,6 +158,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
           </thead>
           <tbody id="receipts-done-body"></tbody>
         </table>
+        <a class="view-more hidden" id="receipts-done-view-more">View More</a>
       </div>
     </div>
 

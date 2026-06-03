@@ -64,6 +64,19 @@ public class ReceiptsController(AppDbContext db, FileStorageService storage) : C
         return Ok(new { message = "Receipt marked as done." });
     }
 
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var receipt = await db.Receipts.FindAsync(id);
+        if (receipt is null) return NotFound();
+
+        storage.DeleteReceipt(receipt.OneDriveFileId);
+        db.Receipts.Remove(receipt);
+        await db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     [HttpGet("{id}/image")]
     public async Task<IActionResult> GetImage(int id)
     {

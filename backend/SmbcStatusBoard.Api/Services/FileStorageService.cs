@@ -27,6 +27,13 @@ public class FileStorageService(IConfiguration config)
         return File.OpenRead(fullPath);
     }
 
+    public void DeleteReceipt(string fileName)
+    {
+        var fullPath = Path.Combine(StoragePath, fileName);
+        if (File.Exists(fullPath))
+            File.Delete(fullPath);
+    }
+
     public string GetContentType(string fileName)
     {
         return Path.GetExtension(fileName).ToLowerInvariant() switch
