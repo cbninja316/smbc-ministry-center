@@ -162,7 +162,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
           <label>Item Access</label>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
             ${ITEM_TYPES.map(t => `
-              <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
+              <label class="check-wrap">
                 <input type="checkbox" value="${t}" class="inv-type-cb">
                 ${ITEM_TYPE_LABELS[t]}
               </label>
@@ -215,7 +215,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
           <label>Item Access</label>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
             ${ITEM_TYPES.map(t => `
-              <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;">
+              <label class="check-wrap">
                 <input type="checkbox" value="${t}" class="edit-type-cb" ${currentTypes.includes(t) ? 'checked' : ''}>
                 ${ITEM_TYPE_LABELS[t]}
               </label>
