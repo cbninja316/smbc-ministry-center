@@ -354,6 +354,20 @@ body {
 }
 .receipt-done-btn:hover { background: #a7f3d0 !important; }
 
+.receipt-delete-btn {
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  background: #ef4444 !important;
+  border: none !important;
+  font-size: 0.82rem !important;
+  padding: 3px 10px !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+.receipt-delete-btn:hover { background: #dc2626 !important; }
+
 /* ── Done receipts sub-section ── */
 .receipts-done-header {
   display: flex;

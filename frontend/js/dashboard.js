@@ -249,10 +249,10 @@ function buildReceiptRow(r, isDone) {
     <td>${escHtml(r.description)}</td>
     <td>$${parseFloat(r.amount).toFixed(2)}</td>
     <td>${escHtml(r.submittedBy)}</td>
-    <td style="display:flex;gap:8px;align-items:center;">
+    <td style="display:flex;gap:8px;align-items:center;justify-content:flex-end;">
       <button class="receipt-view-link">View</button>
       ${!isDone ? `<button class="receipt-done-btn">Done</button>` : ''}
-      ${isDone ? `<button class="receipt-delete-btn" style="color:#c0392b;">Delete</button>` : ''}
+      ${isDone ? `<button class="receipt-delete-btn">Delete</button>` : ''}
     </td>
   `;
 
