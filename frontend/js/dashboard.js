@@ -28,14 +28,25 @@ function renderSummary(summary) {
   document.getElementById('stat-requests').textContent = summary.benevolence ?? 0;
   document.getElementById('stat-facility').textContent = summary.facilityUses ?? 0;
   document.getElementById('stat-maintenance').textContent = summary.maintenance ?? 0;
+
+  const secretaryCard = document.getElementById('stat-card-secretary');
+  if (secretaryCard) {
+    if (canAccess('SecretaryRequest')) {
+      secretaryCard.classList.remove('hidden');
+      document.getElementById('stat-secretary').textContent = summary.secretaryRequests ?? 0;
+    } else {
+      secretaryCard.classList.add('hidden');
+    }
+  }
 }
 
 function refreshSummary() {
   renderSummary({
-    events:       allItems.filter(i => i.type === 'ChurchEvent').length,
-    facilityUses: allItems.filter(i => i.type === 'FacilityUse').length,
-    benevolence:  allItems.filter(i => i.type === 'Benevolence').length,
-    maintenance:  allItems.filter(i => i.type === 'Maintenance').length,
+    events:             allItems.filter(i => i.type === 'ChurchEvent').length,
+    facilityUses:       allItems.filter(i => i.type === 'FacilityUse').length,
+    benevolence:        allItems.filter(i => i.type === 'Benevolence').length,
+    maintenance:        allItems.filter(i => i.type === 'Maintenance').length,
+    secretaryRequests:  allItems.filter(i => i.type === 'SecretaryRequest').length,
   });
 }
 

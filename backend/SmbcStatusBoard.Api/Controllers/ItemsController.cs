@@ -59,7 +59,8 @@ public class ItemsController(AppDbContext db) : ControllerBase
             events = await db.Items.CountAsync(i => i.Type == ItemType.ChurchEvent),
             facilityUses = await db.Items.CountAsync(i => i.Type == ItemType.FacilityUse),
             benevolence = await db.Items.CountAsync(i => i.Type == ItemType.Benevolence),
-            maintenance = await db.Items.CountAsync(i => i.Type == ItemType.Maintenance)
+            maintenance = await db.Items.CountAsync(i => i.Type == ItemType.Maintenance),
+            secretaryRequests = await db.Items.CountAsync(i => i.Type == ItemType.SecretaryRequest)
         });
     }
 
