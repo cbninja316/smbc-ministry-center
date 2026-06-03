@@ -43,6 +43,7 @@ public class PublicController(AppDbContext db, FileStorageService storage) : Con
             Name        = req.Name ?? "",
             Ministry    = req.Ministry,
             RequestedBy = req.RequestedBy,
+            Email       = req.Email,
             EventDate   = req.EventDate,
             Urgency     = req.Urgency,
             Description = req.Description,

@@ -76,6 +76,7 @@ public class ItemsController(AppDbContext db) : ControllerBase
             Ministry = req.Ministry,
             Urgency = req.Urgency,
             RequestedBy = req.RequestedBy,
+            Email = req.Email,
             Description = req.Description,
             Status = ItemStatus.ToDo,
             SortOrder = await db.Items.CountAsync(i => i.Status == ItemStatus.ToDo),
@@ -104,6 +105,7 @@ public class ItemsController(AppDbContext db) : ControllerBase
         item.Ministry = req.Ministry;
         item.Urgency = req.Urgency;
         item.RequestedBy = req.RequestedBy;
+        item.Email = req.Email;
         item.Description = req.Description;
         item.BenevolenceData = req.BenevolenceData != null
             ? JsonSerializer.Serialize(req.BenevolenceData)

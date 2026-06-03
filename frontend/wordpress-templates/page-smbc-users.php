@@ -58,13 +58,14 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
   <script src="<?php echo esc_url($smbc); ?>/js/auth.js"></script>
   <script src="<?php echo esc_url($smbc); ?>/js/modals.js"></script>
   <script>
-    const ITEM_TYPES = ['ChurchEvent', 'FacilityUse', 'Benevolence', 'Maintenance', 'Receipt'];
+    const ITEM_TYPES = ['ChurchEvent', 'FacilityUse', 'Benevolence', 'Maintenance', 'SecretaryRequest', 'Receipt'];
     const ITEM_TYPE_LABELS = {
-      ChurchEvent: 'Church Events',
-      FacilityUse: 'Facility Use',
-      Benevolence: 'Benevolence',
-      Maintenance: 'Maintenance',
-      Receipt: 'Receipts',
+      ChurchEvent:      'Church Events',
+      FacilityUse:      'Facility Use',
+      Benevolence:      'Benevolence',
+      Maintenance:      'Maintenance',
+      SecretaryRequest: 'Secretary Requests',
+      Receipt:          'Receipts',
     };
 
     document.addEventListener('DOMContentLoaded', () => {

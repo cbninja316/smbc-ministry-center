@@ -60,10 +60,11 @@ function formatDate(d) {
 
 function typeLabel(type) {
   return {
-    ChurchEvent: 'Event',
-    FacilityUse: 'Facility Use',
-    Benevolence: 'Benevolence',
-    Maintenance: 'Maintenance',
+    ChurchEvent:      'Event',
+    FacilityUse:      'Facility Use',
+    Benevolence:      'Benevolence',
+    Maintenance:      'Maintenance',
+    SecretaryRequest: 'Secretary Request',
   }[type] || type;
 }
 

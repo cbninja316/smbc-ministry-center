@@ -10,6 +10,7 @@ public record ItemRequest(
     Urgency? Urgency,
     string RequestedBy,
     string Description,
+    string? Email = null,
     BenevolenceData? BenevolenceData = null,
     ChurchEventData? ChurchEventData = null
 );

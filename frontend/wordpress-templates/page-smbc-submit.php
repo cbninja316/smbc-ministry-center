@@ -40,6 +40,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
           <option value="FacilityUse">Facility Use Request</option>
           <option value="Benevolence">Benevolence Request</option>
           <option value="Maintenance">Maintenance Request</option>
+          <option value="SecretaryRequest">Secretary Request</option>
           <option value="Receipt">Receipt Submission</option>
         </select>
       </div>
@@ -228,6 +229,24 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
         <div class="field">
           <label>Details <span style="color:#dc2626">*</span></label>
           <textarea id="mt-description" rows="4" placeholder="Describe the issue, location in the building, and any relevant details..."></textarea>
+        </div>
+      </div>
+
+      <!-- ── Secretary Request Form ──────────────────────────────────── -->
+      <div id="form-SecretaryRequest" class="submit-form-section hidden">
+        <div class="form-row">
+          <div class="field">
+            <label>Requested By <span style="color:#dc2626">*</span></label>
+            <input type="text" id="sr-requestedby" placeholder="Your name">
+          </div>
+          <div class="field">
+            <label>Email <span style="color:#dc2626">*</span></label>
+            <input type="email" id="sr-email" placeholder="email@example.com">
+          </div>
+        </div>
+        <div class="field">
+          <label>Description <span style="color:#dc2626">*</span></label>
+          <textarea id="sr-description" rows="5" placeholder="Describe what you need from the secretary..."></textarea>
         </div>
       </div>
 

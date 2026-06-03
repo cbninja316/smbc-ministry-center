@@ -58,10 +58,11 @@ async function submitItem() {
 
 function buildItemPayload(type) {
   switch (type) {
-    case 'ChurchEvent': return buildChurchEventPayload();
-    case 'FacilityUse': return buildFacilityUsePayload();
-    case 'Benevolence': return buildBenevolencePayload();
-    case 'Maintenance': return buildMaintenancePayload();
+    case 'ChurchEvent':      return buildChurchEventPayload();
+    case 'FacilityUse':      return buildFacilityUsePayload();
+    case 'Benevolence':      return buildBenevolencePayload();
+    case 'Maintenance':      return buildMaintenancePayload();
+    case 'SecretaryRequest': return buildSecretaryRequestPayload();
     default: throw new Error('Unknown type.');
   }
 }
@@ -148,6 +149,19 @@ function buildMaintenancePayload() {
     eventDate:   val('mt-date') || null,
     urgency:     val('mt-urgency') || 'Low',
     description: require(val('mt-description'), 'Details'),
+  };
+}
+
+function buildSecretaryRequestPayload() {
+  const requestedBy = require(val('sr-requestedby'), 'Requested By');
+  const email       = require(val('sr-email'),       'Email');
+  const description = require(val('sr-description'), 'Description');
+  return {
+    type: 'SecretaryRequest',
+    name: requestedBy,
+    requestedBy,
+    email,
+    description,
   };
 }
 

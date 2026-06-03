@@ -23,9 +23,10 @@ function showAlert(container, message, type = 'error') {
 // ── Generic item forms ────────────────────────────────────────────────────────
 
 const ITEM_FIELDS = {
-  ChurchEvent: ['name', 'eventDate', 'ministry', 'urgency', 'requestedBy', 'description'],
-  FacilityUse: ['name', 'eventDate', 'requestedBy', 'description'],
-  Maintenance: ['name', 'eventDate', 'urgency', 'requestedBy', 'description'],
+  ChurchEvent:      ['name', 'eventDate', 'ministry', 'urgency', 'requestedBy', 'description'],
+  FacilityUse:      ['name', 'eventDate', 'requestedBy', 'description'],
+  Maintenance:      ['name', 'eventDate', 'urgency', 'requestedBy', 'description'],
+  SecretaryRequest: ['requestedBy', 'email', 'description'],
 };
 
 const FIELD_LABELS = {
@@ -34,6 +35,7 @@ const FIELD_LABELS = {
   ministry: 'Ministry',
   urgency: 'Urgency',
   requestedBy: 'Requested By',
+  email: 'Email',
   description: 'Description',
 };
 
@@ -66,6 +68,13 @@ function buildItemForm(type, item = null) {
         <div class="field">
           <label>${FIELD_LABELS[f]}</label>
           <input type="date" name="eventDate" value="${dateVal}">
+        </div>`;
+    }
+    if (f === 'email') {
+      return `
+        <div class="field">
+          <label>${FIELD_LABELS[f]}</label>
+          <input type="email" name="email" value="${escModalHtml(val)}" placeholder="email@example.com">
         </div>`;
     }
     return `
@@ -457,9 +466,10 @@ function openEditModal(item, onSave, onDelete) {
   }
 
   const typeLabel = {
-    ChurchEvent: 'Church Event',
-    FacilityUse: 'Facility Use',
-    Maintenance: 'Maintenance Request',
+    ChurchEvent:      'Church Event',
+    FacilityUse:      'Facility Use',
+    Maintenance:      'Maintenance Request',
+    SecretaryRequest: 'Secretary Request',
   }[item.type] || item.type;
 
   const overlay = openModal(`
@@ -488,6 +498,7 @@ function openEditModal(item, onSave, onDelete) {
       ministry: raw.ministry || null,
       urgency: raw.urgency || null,
       requestedBy: raw.requestedBy || '',
+      email: raw.email || null,
       description: raw.description || '',
     };
     try {
@@ -520,9 +531,10 @@ function openCreateModal(type, onSave) {
   }
 
   const typeLabel = {
-    ChurchEvent: 'Church Event',
-    FacilityUse: 'Facility Use',
-    Maintenance: 'Maintenance Request',
+    ChurchEvent:      'Church Event',
+    FacilityUse:      'Facility Use',
+    Maintenance:      'Maintenance Request',
+    SecretaryRequest: 'Secretary Request',
   }[type] || type;
 
   const overlay = openModal(`
@@ -550,6 +562,7 @@ function openCreateModal(type, onSave) {
       ministry: raw.ministry || null,
       urgency: raw.urgency || null,
       requestedBy: raw.requestedBy || '',
+      email: raw.email || null,
       description: raw.description || '',
     };
     try {

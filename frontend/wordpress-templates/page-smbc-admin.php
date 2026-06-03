@@ -90,6 +90,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
             <div data-type="FacilityUse" style="padding:10px 16px;cursor:pointer;font-size:0.9rem;" onmouseover="this.style.background='#f0f4f9'" onmouseout="this.style.background=''">Facility Use</div>
             <div data-type="Benevolence" style="padding:10px 16px;cursor:pointer;font-size:0.9rem;" onmouseover="this.style.background='#f0f4f9'" onmouseout="this.style.background=''">Benevolence Request</div>
             <div data-type="Maintenance" style="padding:10px 16px;cursor:pointer;font-size:0.9rem;" onmouseover="this.style.background='#f0f4f9'" onmouseout="this.style.background=''">Maintenance Request</div>
+            <div data-type="SecretaryRequest" style="padding:10px 16px;cursor:pointer;font-size:0.9rem;" onmouseover="this.style.background='#f0f4f9'" onmouseout="this.style.background=''">Secretary Request</div>
           </div>
         </div>
       </div>

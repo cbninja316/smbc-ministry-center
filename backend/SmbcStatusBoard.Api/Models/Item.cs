@@ -10,7 +10,8 @@ public enum ItemType
     ChurchEvent,
     FacilityUse,
     Benevolence,
-    Maintenance
+    Maintenance,
+    SecretaryRequest
 }
 
 public enum ItemStatus { ToDo, InProgress, Done }
@@ -26,6 +27,7 @@ public class Item
     public string? Ministry { get; set; }
     public Urgency? Urgency { get; set; }
     public string RequestedBy { get; set; } = string.Empty;
+    public string? Email { get; set; }
     public string Description { get; set; } = string.Empty;
     public ItemStatus Status { get; set; } = ItemStatus.ToDo;
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
