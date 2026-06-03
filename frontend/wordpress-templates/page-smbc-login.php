@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: SMBC Login
- * Description: SMBC Admin — Login page
+ * Description: One Accord — Login page
  */
 $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 ?><!DOCTYPE html>
@@ -9,7 +9,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SMBC Admin — Login</title>
+  <title>One Accord — Login</title>
   <?php wp_head(); ?>
   <link rel="stylesheet" href="<?php echo esc_url($smbc); ?>/css/styles.css">
   <style>
@@ -19,7 +19,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 </head>
 <body class="auth-page">
   <div class="auth-card">
-    <h1>SMBC Admin</h1>
+    <h1>One Accord</h1>
     <p>Sign in to access the status board.</p>
     <div id="alert-container"></div>
     <div class="field">

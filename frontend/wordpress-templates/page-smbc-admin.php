@@ -1,7 +1,7 @@
 <?php
 /**
- * Template Name: SMBC Admin Dashboard
- * Description: SMBC Admin — Main status board and receipts dashboard
+ * Template Name: One Accord Dashboard
+ * Description: One Accord — Main status board and receipts dashboard
  */
 $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 ?><!DOCTYPE html>
@@ -9,7 +9,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SMBC Admin</title>
+  <title>One Accord</title>
   <?php wp_head(); ?>
   <link rel="stylesheet" href="<?php echo esc_url($smbc); ?>/css/styles.css">
   <style>
@@ -21,7 +21,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 
   <!-- Nav -->
   <nav class="nav">
-    <a href="#" id="nav-brand" class="nav-brand">SMBC Admin</a>
+    <a href="#" id="nav-brand" class="nav-brand">One Accord</a>
     <div class="nav-user">
       <span id="nav-username"></span>
       <a href="#" id="users-link" class="hidden" style="color:rgba(255,255,255,0.85);font-size:0.88rem;text-decoration:none;">Manage Users</a>

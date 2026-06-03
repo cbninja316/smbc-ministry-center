@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────
-//  SMBC Admin — Configuration
+//  One Accord — Configuration
 //  Change these values when switching between local and production.
 // ─────────────────────────────────────────────────────────────────
 

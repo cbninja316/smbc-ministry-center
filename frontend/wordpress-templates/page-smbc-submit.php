@@ -20,7 +20,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 <body>
 
   <nav class="nav">
-    <span class="nav-brand">SMBC Ministry Center</span>
+    <span class="nav-brand">One Accord</span>
   </nav>
 
   <div class="dashboard">

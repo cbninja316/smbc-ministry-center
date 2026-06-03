@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: SMBC Setup Password
- * Description: SMBC Admin — Set password for invited users
+ * Description: One Accord — Set password for invited users
  */
 $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 ?><!DOCTYPE html>
@@ -9,7 +9,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SMBC Admin — Set Password</title>
+  <title>One Accord — Set Password</title>
   <?php wp_head(); ?>
   <link rel="stylesheet" href="<?php echo esc_url($smbc); ?>/css/styles.css">
   <style>

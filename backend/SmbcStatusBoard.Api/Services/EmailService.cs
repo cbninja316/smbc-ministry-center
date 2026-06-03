@@ -34,7 +34,7 @@ public class EmailService(IConfiguration config)
                     {rows}
                   </table>
                   <p style="margin:20px 0 0;color:#9ca3af;font-size:0.8rem;">
-                    Log in to SMBC Admin to view and manage this request.
+                    Log in to One Accord to view and manage this request.
                   </p>
                 </div>
               </div>
@@ -56,7 +56,7 @@ public class EmailService(IConfiguration config)
         foreach (var (email, name) in recipients)
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "SMBC Admin", config["Email:FromAddress"] ?? "admin@church.org"));
+            message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
             message.To.Add(new MailboxAddress(name, email));
             message.Subject = $"New {typeLabel} Submitted";
             message.Body = new TextPart("html") { Text = html };
@@ -69,15 +69,15 @@ public class EmailService(IConfiguration config)
     public async Task SendInviteAsync(string toEmail, string toName, string inviteLink)
     {
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "SMBC Admin", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
         message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = "You've been invited to SMBC Admin";
+        message.Subject = "You've been invited to One Accord";
 
         message.Body = new TextPart("html")
         {
             Text = $"""
                 <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
-                  <h2 style="color: #005DBA;">Welcome to SMBC Admin</h2>
+                  <h2 style="color: #005DBA;">Welcome to One Accord</h2>
                   <p>You've been added as an administrator. Click the button below to set your password and get started.</p>
                   <a href="{inviteLink}" style="display:inline-block;padding:12px 24px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Set My Password</a>
                   <p style="color:#888;font-size:12px;margin-top:24px;">This link expires in 48 hours.</p>

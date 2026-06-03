@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: SMBC Manage Users
- * Description: SMBC Admin — User management (Super Admin only)
+ * Description: One Accord — User management (Super Admin only)
  */
 $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 ?><!DOCTYPE html>
@@ -9,7 +9,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SMBC Admin — Manage Users</title>
+  <title>One Accord — Manage Users</title>
   <?php wp_head(); ?>
   <link rel="stylesheet" href="<?php echo esc_url($smbc); ?>/css/styles.css">
   <style>
@@ -20,7 +20,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
 <body>
 
   <nav class="nav">
-    <a href="#" id="nav-brand" class="nav-brand">SMBC Admin</a>
+    <a href="#" id="nav-brand" class="nav-brand">One Accord</a>
     <div class="nav-user">
       <span id="nav-username"></span>
       <button id="logout-btn">Sign Out</button>
