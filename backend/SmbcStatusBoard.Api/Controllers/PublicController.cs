@@ -12,7 +12,7 @@ namespace SmbcStatusBoard.Api.Controllers;
 [ApiController]
 [Route("api/public")]
 [AllowAnonymous]
-public class PublicController(AppDbContext db, FileStorageService storage) : ControllerBase
+public class PublicController(AppDbContext db, FileStorageService storage, EmailService emailService) : ControllerBase
 {
     // POST /api/public/items — anonymous item submission
     [HttpPost("items")]
@@ -60,6 +60,100 @@ public class PublicController(AppDbContext db, FileStorageService storage) : Con
 
         db.Items.Add(item);
         await db.SaveChangesAsync();
+
+        // ── Notify users who have access to this item type ──────────────────
+        try
+        {
+            var typeString = req.Type.ToString();
+            var recipients = await db.Users
+                .Where(u => u.IsActive && (
+                    u.Role == UserRole.SuperAdmin ||
+                    u.AllowedItemTypes.Contains(typeString)))
+                .Select(u => new { u.Email, u.Username })
+                .ToListAsync();
+
+            var typeLabel = req.Type switch
+            {
+                ItemType.ChurchEvent      => "Church Event",
+                ItemType.FacilityUse      => "Facility Use Request",
+                ItemType.Benevolence      => "Benevolence Request",
+                ItemType.Maintenance      => "Maintenance Request",
+                ItemType.SecretaryRequest => "Secretary Request",
+                _                         => req.Type.ToString()
+            };
+
+            var details = req.Type switch
+            {
+                ItemType.SecretaryRequest => new List<(string, string)>
+                {
+                    ("Requested By", req.RequestedBy),
+                    ("Email",        req.Email ?? ""),
+                    ("Description",  req.Description),
+                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                },
+                ItemType.Maintenance => new List<(string, string)>
+                {
+                    ("Title",        req.Name ?? ""),
+                    ("Requested By", req.RequestedBy),
+                    ("Urgency",      req.Urgency?.ToString() ?? ""),
+                    ("Date Needed",  req.EventDate?.ToString("MMMM d, yyyy") ?? ""),
+                    ("Details",      req.Description),
+                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                },
+                ItemType.FacilityUse => new List<(string, string)>
+                {
+                    ("Event Name",   req.Name ?? ""),
+                    ("Requested By", req.RequestedBy),
+                    ("Event Date",   req.EventDate?.ToString("MMMM d, yyyy") ?? ""),
+                    ("Description",  req.Description),
+                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                },
+                ItemType.ChurchEvent => new List<(string, string)>
+                {
+                    ("Event Name",   req.Name ?? ""),
+                    ("Ministry",     req.Ministry ?? ""),
+                    ("Contact",      req.RequestedBy),
+                    ("Event Date",   req.EventDate?.ToString("MMMM d, yyyy") ?? ""),
+                    ("Event Time",   req.ChurchEventData?.EventTime ?? ""),
+                    ("Location",     req.ChurchEventData?.Location ?? ""),
+                    ("Cost",         req.ChurchEventData?.Cost?.ToString("C") ?? ""),
+                    ("Description",  req.Description),
+                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                },
+                ItemType.Benevolence => new List<(string, string)>
+                {
+                    ("Applicant",    req.RequestedBy),
+                    ("Phone",        req.BenevolenceData?.Phone ?? ""),
+                    ("Address",      string.Join(", ", new[] {
+                                         req.BenevolenceData?.StreetAddress,
+                                         req.BenevolenceData?.City,
+                                         req.BenevolenceData?.State,
+                                         req.BenevolenceData?.ZipCode
+                                     }.Where(s => !string.IsNullOrWhiteSpace(s)))),
+                    ("Amount Requested", req.BenevolenceData?.AmountRequested?.ToString("C") ?? ""),
+                    ("Date Needed",  req.BenevolenceData?.DateNeeded ?? ""),
+                    ("Relationship", req.BenevolenceData?.RelationshipToChurch ?? ""),
+                    ("Reason",       req.Description),
+                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                },
+                _ => new List<(string, string)>
+                {
+                    ("Requested By", req.RequestedBy),
+                    ("Description",  req.Description),
+                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                }
+            };
+
+            await emailService.SendNewRequestAsync(
+                recipients.Select(r => (r.Email, r.Username)).ToList(),
+                typeLabel,
+                details);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the submission if email sending errors
+            Console.WriteLine($"[Email] Failed to send new-request notification: {ex.Message}");
+        }
 
         return Ok(new { message = "Submitted successfully." });
     }
