@@ -1,8 +1,10 @@
 function openModal(html, wide = false) {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML = `<div class="modal${wide ? ' modal-wide' : ''}">${html}</div>`;
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(overlay); });
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `<div class="modal${wide ? " modal-wide" : ""}">${html}</div>`;
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal(overlay);
+  });
   document.body.appendChild(overlay);
   return overlay;
 }
@@ -11,10 +13,10 @@ function closeModal(overlay) {
   overlay.remove();
 }
 
-function showAlert(container, message, type = 'error') {
-  const existing = container.querySelector('.alert');
+function showAlert(container, message, type = "error") {
+  const existing = container.querySelector(".alert");
   if (existing) existing.remove();
-  const el = document.createElement('div');
+  const el = document.createElement("div");
   el.className = `alert alert-${type}`;
   el.textContent = message;
   container.prepend(el);
@@ -23,71 +25,85 @@ function showAlert(container, message, type = 'error') {
 // ── Generic item forms ────────────────────────────────────────────────────────
 
 const ITEM_FIELDS = {
-  ChurchEvent:      ['name', 'eventDate', 'ministry', 'urgency', 'requestedBy', 'description'],
-  FacilityUse:      ['name', 'eventDate', 'requestedBy', 'description'],
-  Maintenance:      ['name', 'eventDate', 'urgency', 'requestedBy', 'description'],
-  SecretaryRequest: ['requestedBy', 'email', 'description'],
+  ChurchEvent: [
+    "name",
+    "eventDate",
+    "ministry",
+    "urgency",
+    "requestedBy",
+    "description",
+  ],
+  FacilityUse: ["name", "eventDate", "requestedBy", "description"],
+  Maintenance: ["name", "eventDate", "urgency", "requestedBy", "description"],
+  SecretaryRequest: ["requestedBy", "email", "description"],
 };
 
 const FIELD_LABELS = {
-  name: 'Event Name',
-  eventDate: 'Date',
-  ministry: 'Ministry',
-  urgency: 'Urgency',
-  requestedBy: 'Requested By',
-  email: 'Email',
-  description: 'Description',
+  name: "Event Name",
+  eventDate: "Date",
+  ministry: "Ministry",
+  urgency: "Urgency",
+  requestedBy: "Requested By",
+  email: "Email",
+  description: "Description",
 };
 
 function buildItemForm(type, item = null) {
   const fields = ITEM_FIELDS[type] || [];
-  return fields.map(f => {
-    const val = item ? (item[f] ?? '') : '';
-    if (f === 'urgency') {
-      return `
+  return fields
+    .map((f) => {
+      const val = item ? (item[f] ?? "") : "";
+      if (f === "urgency") {
+        return `
         <div class="field">
           <label>${FIELD_LABELS[f]}</label>
           <select name="urgency">
             <option value="">-- Select --</option>
-            ${['Low','Medium','Urgent'].map(u =>
-              `<option value="${u}" ${val === u ? 'selected' : ''}>${u}</option>`
-            ).join('')}
+            ${["Low", "Medium", "Urgent"]
+              .map(
+                (u) =>
+                  `<option value="${u}" ${val === u ? "selected" : ""}>${u}</option>`,
+              )
+              .join("")}
           </select>
         </div>`;
-    }
-    if (f === 'description') {
-      return `
+      }
+      if (f === "description") {
+        return `
         <div class="field">
           <label>${FIELD_LABELS[f]}</label>
           <textarea name="description" rows="4">${val}</textarea>
         </div>`;
-    }
-    if (f === 'eventDate') {
-      const dateVal = val ? new Date(val).toISOString().split('T')[0] : '';
-      return `
+      }
+      if (f === "eventDate") {
+        const dateVal = val ? new Date(val).toISOString().split("T")[0] : "";
+        return `
         <div class="field">
           <label>${FIELD_LABELS[f]}</label>
           <input type="date" name="eventDate" value="${dateVal}">
         </div>`;
-    }
-    if (f === 'email') {
-      return `
+      }
+      if (f === "email") {
+        return `
         <div class="field">
           <label>${FIELD_LABELS[f]}</label>
           <input type="email" name="email" value="${escModalHtml(val)}" placeholder="email@example.com">
         </div>`;
-    }
-    return `
+      }
+      return `
       <div class="field">
         <label>${FIELD_LABELS[f]}</label>
         <input type="text" name="${f}" value="${escModalHtml(val)}">
       </div>`;
-  }).join('');
+    })
+    .join("");
 }
 
 function getFormData(form) {
   const data = {};
-  new FormData(form).forEach((v, k) => { data[k] = v; });
+  new FormData(form).forEach((v, k) => {
+    data[k] = v;
+  });
   return data;
 }
 
@@ -95,54 +111,54 @@ function getFormData(form) {
 
 function buildBenevolenceForm(item = null) {
   const b = item?.benevolenceDetails || {};
-  const v = (key, fallback = '') => escModalHtml(b[key] ?? fallback);
-  const dateVal = (key) => b[key] ? b[key].split('T')[0] : '';
-  const det = b.determination || '';
-  const method = b.methodOfAssistance || '';
-  const showApproval = det === 'ApprovedFull' || det === 'ApprovedPart';
+  const v = (key, fallback = "") => escModalHtml(b[key] ?? fallback);
+  const dateVal = (key) => (b[key] ? b[key].split("T")[0] : "");
+  const det = b.determination || "";
+  const method = b.methodOfAssistance || "";
+  const showApproval = det === "ApprovedFull" || det === "ApprovedPart";
 
   return `
     <p class="benev-notice">When a church assists church members or other individuals, the IRS requires the church to keep certain documentation and records. This form should be filled out each time a request for financial assistance is received and/or the church helps a person financially. This confidential form should be kept with the church's financial records.</p>
 
     <div class="field">
       <label>Name of Applicant</label>
-      <input type="text" id="b-applicant" value="${item ? escModalHtml(item.requestedBy) : ''}">
+      <input type="text" id="b-applicant" value="${item ? escModalHtml(item.requestedBy) : ""}">
     </div>
     <div class="field">
       <label>Street Address</label>
-      <input type="text" id="b-street" value="${v('streetAddress')}">
+      <input type="text" id="b-street" value="${v("streetAddress")}">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
       <div class="field">
         <label>City</label>
-        <input type="text" id="b-city" value="${v('city')}">
+        <input type="text" id="b-city" value="${v("city")}">
       </div>
       <div class="field">
         <label>State</label>
-        <input type="text" id="b-state" value="${v('state')}">
+        <input type="text" id="b-state" value="${v("state")}">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
       <div class="field">
         <label>Zip Code</label>
-        <input type="text" id="b-zip" value="${v('zipCode')}">
+        <input type="text" id="b-zip" value="${v("zipCode")}">
       </div>
       <div class="field">
         <label>Phone</label>
-        <input type="tel" id="b-phone" value="${v('phone')}">
+        <input type="tel" id="b-phone" value="${v("phone")}">
       </div>
     </div>
     <div class="field">
       <label>Brief description of assistance being requested</label>
-      <textarea id="b-description" rows="3">${item ? escModalHtml(item.description) : ''}</textarea>
+      <textarea id="b-description" rows="3">${item ? escModalHtml(item.description) : ""}</textarea>
     </div>
     <div class="field">
       <label>Amount of assistance requested, if known</label>
-      <input type="number" id="b-amount-req" step="0.01" min="0" value="${v('amountRequested')}">
+      <input type="number" id="b-amount-req" step="1.00" min="0" value="${v("amountRequested")}">
     </div>
     <div class="field">
       <label>Date assistance is needed by, if applicable</label>
-      <input type="date" id="b-date-needed" value="${dateVal('dateNeeded')}">
+      <input type="date" id="b-date-needed" value="${dateVal("dateNeeded")}">
     </div>
 
     <div class="benev-section">
@@ -151,11 +167,11 @@ function buildBenevolenceForm(item = null) {
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
         <div class="field">
           <label>Applicant/Requestor Signature</label>
-          <input type="text" id="b-signature" placeholder="Type full name as signature" value="${v('applicantSignature')}">
+          <input type="text" id="b-signature" placeholder="Type full name as signature" value="${v("applicantSignature")}">
         </div>
         <div class="field">
           <label>Date</label>
-          <input type="date" id="b-sig-date" value="${dateVal('signatureDate')}">
+          <input type="date" id="b-sig-date" value="${dateVal("signatureDate")}">
         </div>
       </div>
     </div>
@@ -165,70 +181,70 @@ function buildBenevolenceForm(item = null) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="field">
           <label>Date Reviewed</label>
-          <input type="date" id="b-date-reviewed" value="${dateVal('dateReviewed')}">
+          <input type="date" id="b-date-reviewed" value="${dateVal("dateReviewed")}">
         </div>
         <div class="field">
           <label>Relationship to church members or church leaders</label>
-          <input type="text" id="b-relationship" value="${v('relationshipToChurch')}">
+          <input type="text" id="b-relationship" value="${v("relationshipToChurch")}">
         </div>
       </div>
 
       <p style="font-weight:700;margin:16px 0 10px;">DETERMINATION</p>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
         <label class="benev-radio-label">
-          <input type="radio" name="b-determination" value="ApprovedFull" ${det === 'ApprovedFull' ? 'checked' : ''}>
+          <input type="radio" name="b-determination" value="ApprovedFull" ${det === "ApprovedFull" ? "checked" : ""}>
           ☐ Request Approved in Full
         </label>
         <label class="benev-radio-label">
-          <input type="radio" name="b-determination" value="ApprovedPart" ${det === 'ApprovedPart' ? 'checked' : ''}>
+          <input type="radio" name="b-determination" value="ApprovedPart" ${det === "ApprovedPart" ? "checked" : ""}>
           ☐ Request Approved in Part
         </label>
         <label class="benev-radio-label">
-          <input type="radio" name="b-determination" value="NotApproved" ${det === 'NotApproved' ? 'checked' : ''}>
+          <input type="radio" name="b-determination" value="NotApproved" ${det === "NotApproved" ? "checked" : ""}>
           ☐ Request Not Approved
         </label>
       </div>
 
       <div class="field">
         <label>Reason the assistance was granted or the request was not fulfilled</label>
-        <textarea id="b-denial-reason" rows="2">${v('denialReason')}</textarea>
+        <textarea id="b-denial-reason" rows="2">${v("denialReason")}</textarea>
       </div>
 
-      <div id="b-approval-details" style="${showApproval ? '' : 'display:none;'}">
+      <div id="b-approval-details" style="${showApproval ? "" : "display:none;"}">
         <div class="field">
           <label>Brief description of assistance provided by the church</label>
-          <textarea id="b-assist-desc" rows="2">${v('assistanceProvidedDescription')}</textarea>
+          <textarea id="b-assist-desc" rows="2">${v("assistanceProvidedDescription")}</textarea>
         </div>
         <div class="field">
           <label>Cost of the assistance</label>
-          <input type="number" id="b-assist-cost" step="0.01" min="0" value="${v('assistanceCost')}">
+          <input type="number" id="b-assist-cost" step="1.00" min="0" value="${v("assistanceCost")}">
         </div>
 
         <p style="font-weight:600;margin:12px 0 8px;">Method of Assistance:</p>
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
           <label class="benev-radio-label">
-            <input type="radio" name="b-method" value="DirectPayment" ${method === 'DirectPayment' ? 'checked' : ''}>
+            <input type="radio" name="b-method" value="DirectPayment" ${method === "DirectPayment" ? "checked" : ""}>
             ☐ Payment Directly to Provider/Business
           </label>
           <label class="benev-radio-label">
-            <input type="radio" name="b-method" value="CashGrant" ${method === 'CashGrant' ? 'checked' : ''}>
+            <input type="radio" name="b-method" value="CashGrant" ${method === "CashGrant" ? "checked" : ""}>
             ☐ Cash Grant
           </label>
           <label class="benev-radio-label">
-            <input type="radio" name="b-method" value="Other" ${method === 'Other' ? 'checked' : ''}>
+            <input type="radio" name="b-method" value="Other" ${method === "Other" ? "checked" : ""}>
             ☐ Other:
-            <input type="text" id="b-method-other" placeholder="describe" style="margin-left:8px;flex:1;border:none;border-bottom:1px solid var(--border);outline:none;font-size:0.9rem;" value="${v('methodOtherDescription')}">
+            <input type="text" id="b-method-other" placeholder="describe" style="margin-left:8px;flex:1;border:none;border-bottom:1px solid var(--border);outline:none;font-size:0.9rem;" value="${v("methodOtherDescription")}">
           </label>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="field">
             <label>Payable To/Provider Name</label>
-            <input type="text" id="b-payable-to" value="${v('payableTo')}">
+            <input type="text" id="b-payable-to" value="${v("payableTo")}">
           </div>
           <div class="field">
             <label>Date Assistance Provided</label>
-            <input type="date" id="b-date-provided" value="${dateVal('dateAssistanceProvided')}">
+            <input type="date" id="b-date-provided" value="${dateVal("dateAssistanceProvided")}">
           </div>
         </div>
       </div>
@@ -246,36 +262,49 @@ function buildBenevolenceForm(item = null) {
 }
 
 function setupDeterminationToggle(overlay) {
-  overlay.querySelectorAll('input[name="b-determination"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const val = overlay.querySelector('input[name="b-determination"]:checked')?.value;
-      const details = overlay.querySelector('#b-approval-details');
-      if (details) details.style.display = (val === 'ApprovedFull' || val === 'ApprovedPart') ? '' : 'none';
+  overlay.querySelectorAll('input[name="b-determination"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      const val = overlay.querySelector(
+        'input[name="b-determination"]:checked',
+      )?.value;
+      const details = overlay.querySelector("#b-approval-details");
+      if (details)
+        details.style.display =
+          val === "ApprovedFull" || val === "ApprovedPart" ? "" : "none";
     });
   });
 }
 
 function collectBenevolenceData(overlay) {
   return {
-    streetAddress: overlay.querySelector('#b-street')?.value || null,
-    city: overlay.querySelector('#b-city')?.value || null,
-    state: overlay.querySelector('#b-state')?.value || null,
-    zipCode: overlay.querySelector('#b-zip')?.value || null,
-    phone: overlay.querySelector('#b-phone')?.value || null,
-    amountRequested: parseFloat(overlay.querySelector('#b-amount-req')?.value) || null,
-    dateNeeded: overlay.querySelector('#b-date-needed')?.value || null,
-    applicantSignature: overlay.querySelector('#b-signature')?.value || null,
-    signatureDate: overlay.querySelector('#b-sig-date')?.value || null,
-    dateReviewed: overlay.querySelector('#b-date-reviewed')?.value || null,
-    relationshipToChurch: overlay.querySelector('#b-relationship')?.value || null,
-    determination: overlay.querySelector('input[name="b-determination"]:checked')?.value || null,
-    denialReason: overlay.querySelector('#b-denial-reason')?.value || null,
-    assistanceProvidedDescription: overlay.querySelector('#b-assist-desc')?.value || null,
-    assistanceCost: parseFloat(overlay.querySelector('#b-assist-cost')?.value) || null,
-    methodOfAssistance: overlay.querySelector('input[name="b-method"]:checked')?.value || null,
-    methodOtherDescription: overlay.querySelector('#b-method-other')?.value || null,
-    payableTo: overlay.querySelector('#b-payable-to')?.value || null,
-    dateAssistanceProvided: overlay.querySelector('#b-date-provided')?.value || null,
+    streetAddress: overlay.querySelector("#b-street")?.value || null,
+    city: overlay.querySelector("#b-city")?.value || null,
+    state: overlay.querySelector("#b-state")?.value || null,
+    zipCode: overlay.querySelector("#b-zip")?.value || null,
+    phone: overlay.querySelector("#b-phone")?.value || null,
+    amountRequested:
+      parseFloat(overlay.querySelector("#b-amount-req")?.value) || null,
+    dateNeeded: overlay.querySelector("#b-date-needed")?.value || null,
+    applicantSignature: overlay.querySelector("#b-signature")?.value || null,
+    signatureDate: overlay.querySelector("#b-sig-date")?.value || null,
+    dateReviewed: overlay.querySelector("#b-date-reviewed")?.value || null,
+    relationshipToChurch:
+      overlay.querySelector("#b-relationship")?.value || null,
+    determination:
+      overlay.querySelector('input[name="b-determination"]:checked')?.value ||
+      null,
+    denialReason: overlay.querySelector("#b-denial-reason")?.value || null,
+    assistanceProvidedDescription:
+      overlay.querySelector("#b-assist-desc")?.value || null,
+    assistanceCost:
+      parseFloat(overlay.querySelector("#b-assist-cost")?.value) || null,
+    methodOfAssistance:
+      overlay.querySelector('input[name="b-method"]:checked')?.value || null,
+    methodOtherDescription:
+      overlay.querySelector("#b-method-other")?.value || null,
+    payableTo: overlay.querySelector("#b-payable-to")?.value || null,
+    dateAssistanceProvided:
+      overlay.querySelector("#b-date-provided")?.value || null,
   };
 }
 
@@ -283,13 +312,15 @@ function collectBenevolenceData(overlay) {
 
 function buildChurchEventForm(item = null) {
   const c = item?.churchEventDetails || {};
-  const v = (key, fallback = '') => escModalHtml(c[key] ?? fallback);
-  const chk = (key) => c[key] ? 'checked' : '';
-  const nameVal = escModalHtml(item?.name ?? '');
-  const ministryVal = escModalHtml(item?.ministry ?? '');
-  const contactVal = escModalHtml(item?.requestedBy ?? '');
-  const dateVal = item?.eventDate ? new Date(item.eventDate).toISOString().split('T')[0] : '';
-  const descVal = escModalHtml(item?.description ?? '');
+  const v = (key, fallback = "") => escModalHtml(c[key] ?? fallback);
+  const chk = (key) => (c[key] ? "checked" : "");
+  const nameVal = escModalHtml(item?.name ?? "");
+  const ministryVal = escModalHtml(item?.ministry ?? "");
+  const contactVal = escModalHtml(item?.requestedBy ?? "");
+  const dateVal = item?.eventDate
+    ? new Date(item.eventDate).toISOString().split("T")[0]
+    : "";
+  const descVal = escModalHtml(item?.description ?? "");
 
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -313,26 +344,26 @@ function buildChurchEventForm(item = null) {
       </div>
       <div class="field">
         <label>Event Time</label>
-        <input type="time" id="ce-time" value="${v('eventTime')}">
+        <input type="time" id="ce-time" value="${v("eventTime")}">
       </div>
     </div>
     <div class="field">
       <label>Location</label>
-      <input type="text" id="ce-location" value="${v('location')}">
+      <input type="text" id="ce-location" value="${v("location")}">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
       <div class="field">
         <label>Cost (if any)</label>
-        <input type="number" id="ce-cost" step="0.01" min="0" placeholder="0.00" value="${v('cost')}">
+        <input type="number" id="ce-cost" step="1.00" min="0" placeholder="0.00" value="${v("cost")}">
       </div>
       <div class="field" style="display:flex;flex-direction:column;justify-content:flex-end;">
         <label style="margin-bottom:10px;">Registration</label>
         <div style="display:flex;gap:20px;">
           <label class="benev-radio-label">
-            <input type="radio" name="ce-registration" value="yes" ${c.registrationRequired ? 'checked' : ''}> Yes
+            <input type="radio" name="ce-registration" value="yes" ${c.registrationRequired ? "checked" : ""}> Yes
           </label>
           <label class="benev-radio-label">
-            <input type="radio" name="ce-registration" value="no" ${!c.registrationRequired ? 'checked' : ''}> Not Required
+            <input type="radio" name="ce-registration" value="no" ${!c.registrationRequired ? "checked" : ""}> Not Required
           </label>
         </div>
       </div>
@@ -346,19 +377,19 @@ function buildChurchEventForm(item = null) {
       <p style="font-weight:700;font-size:0.95rem;color:var(--primary);margin-bottom:14px;letter-spacing:0.03em;">PROMOTION &amp; COMMUNICATION REQUESTS</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <label class="benev-radio-label" style="align-items:flex-start;gap:10px;">
-          <input type="checkbox" id="ce-fb-post" ${chk('promoteFacebook')} style="margin-top:2px;">
+          <input type="checkbox" id="ce-fb-post" ${chk("promoteFacebook")} style="margin-top:2px;">
           <span><strong>Facebook Post</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Standard post on church page for regular followers.</span></span>
         </label>
         <label class="benev-radio-label" style="align-items:flex-start;gap:10px;">
-          <input type="checkbox" id="ce-fb-event" ${chk('promoteFacebookEvent')} style="margin-top:2px;">
+          <input type="checkbox" id="ce-fb-event" ${chk("promoteFacebookEvent")} style="margin-top:2px;">
           <span><strong>Facebook Event</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Dedicated event page — discoverable and shareable beyond regular followers.</span></span>
         </label>
         <label class="benev-radio-label" style="align-items:flex-start;gap:10px;">
-          <input type="checkbox" id="ce-text" ${chk('promoteText')} style="margin-top:2px;">
+          <input type="checkbox" id="ce-text" ${chk("promoteText")} style="margin-top:2px;">
           <span><strong>Text Message</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Sent to text message subscribers only.</span></span>
         </label>
         <label class="benev-radio-label" style="align-items:flex-start;gap:10px;">
-          <input type="checkbox" id="ce-email" ${chk('promoteEmail')} style="margin-top:2px;">
+          <input type="checkbox" id="ce-email" ${chk("promoteEmail")} style="margin-top:2px;">
           <span><strong>Email Message</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Sent to email subscribers only.</span></span>
         </label>
       </div>
@@ -377,78 +408,85 @@ function buildChurchEventForm(item = null) {
 
 function collectChurchEventData(overlay) {
   return {
-    eventTime: overlay.querySelector('#ce-time')?.value || null,
-    location: overlay.querySelector('#ce-location')?.value || null,
-    cost: parseFloat(overlay.querySelector('#ce-cost')?.value) || null,
-    registrationRequired: overlay.querySelector('input[name="ce-registration"]:checked')?.value === 'yes',
-    promoteFacebook: overlay.querySelector('#ce-fb-post')?.checked || false,
-    promoteFacebookEvent: overlay.querySelector('#ce-fb-event')?.checked || false,
-    promoteText: overlay.querySelector('#ce-text')?.checked || false,
-    promoteEmail: overlay.querySelector('#ce-email')?.checked || false,
+    eventTime: overlay.querySelector("#ce-time")?.value || null,
+    location: overlay.querySelector("#ce-location")?.value || null,
+    cost: parseFloat(overlay.querySelector("#ce-cost")?.value) || null,
+    registrationRequired:
+      overlay.querySelector('input[name="ce-registration"]:checked')?.value ===
+      "yes",
+    promoteFacebook: overlay.querySelector("#ce-fb-post")?.checked || false,
+    promoteFacebookEvent:
+      overlay.querySelector("#ce-fb-event")?.checked || false,
+    promoteText: overlay.querySelector("#ce-text")?.checked || false,
+    promoteEmail: overlay.querySelector("#ce-email")?.checked || false,
   };
 }
 
 function openChurchEventModal(item, onSave, onDelete) {
   const isEdit = item !== null;
-  const overlay = openModal(`
+  const overlay = openModal(
+    `
     <div class="modal-header">
-      <h2>${isEdit ? 'Edit Church Event' : 'New Church Event'}</h2>
+      <h2>${isEdit ? "Edit Church Event" : "New Church Event"}</h2>
       <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       </button>
     </div>
     ${buildChurchEventForm(item)}
     <div class="modal-actions" style="margin-top:24px;">
-      ${isEdit && onDelete ? '<button class="btn btn-danger" id="delete-btn">Delete</button>' : ''}
+      ${isEdit && onDelete ? '<button class="btn btn-danger" id="delete-btn">Delete</button>' : ""}
       <button class="btn" id="print-btn" style="background:#f0f4f9;color:var(--secondary);margin-right:auto;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Print
       </button>
-      <button class="btn btn-primary" id="save-btn">${isEdit ? 'Save' : 'Create'}</button>
+      <button class="btn btn-primary" id="save-btn">${isEdit ? "Save" : "Create"}</button>
     </div>
-  `, true);
+  `,
+    true,
+  );
 
-  overlay.querySelector('#print-btn').addEventListener('click', () => {
-    const name = overlay.querySelector('#ce-name')?.value.trim() || '';
-    const ministry = overlay.querySelector('#ce-ministry')?.value.trim() || '';
-    const contact = overlay.querySelector('#ce-contact')?.value.trim() || '';
-    const date = overlay.querySelector('#ce-date')?.value || '';
-    const description = overlay.querySelector('#ce-description')?.value.trim() || '';
+  overlay.querySelector("#print-btn").addEventListener("click", () => {
+    const name = overlay.querySelector("#ce-name")?.value.trim() || "";
+    const ministry = overlay.querySelector("#ce-ministry")?.value.trim() || "";
+    const contact = overlay.querySelector("#ce-contact")?.value.trim() || "";
+    const date = overlay.querySelector("#ce-date")?.value || "";
+    const description =
+      overlay.querySelector("#ce-description")?.value.trim() || "";
     const data = collectChurchEventData(overlay);
     printChurchEventForm(name, ministry, contact, date, description, data);
   });
 
-  overlay.querySelector('#save-btn').addEventListener('click', async () => {
-    const name = overlay.querySelector('#ce-name')?.value.trim() || '';
+  overlay.querySelector("#save-btn").addEventListener("click", async () => {
+    const name = overlay.querySelector("#ce-name")?.value.trim() || "";
     if (!name) {
-      showAlert(overlay.querySelector('.modal'), 'Event Name is required.');
+      showAlert(overlay.querySelector(".modal"), "Event Name is required.");
       return;
     }
     const payload = {
-      type: 'ChurchEvent',
+      type: "ChurchEvent",
       name,
-      eventDate: overlay.querySelector('#ce-date')?.value || null,
-      ministry: overlay.querySelector('#ce-ministry')?.value.trim() || null,
+      eventDate: overlay.querySelector("#ce-date")?.value || null,
+      ministry: overlay.querySelector("#ce-ministry")?.value.trim() || null,
       urgency: null,
-      requestedBy: overlay.querySelector('#ce-contact')?.value.trim() || '',
-      description: overlay.querySelector('#ce-description')?.value.trim() || '',
+      requestedBy: overlay.querySelector("#ce-contact")?.value.trim() || "",
+      description: overlay.querySelector("#ce-description")?.value.trim() || "",
       churchEventData: collectChurchEventData(overlay),
     };
     try {
       await onSave(payload);
       closeModal(overlay);
     } catch (e) {
-      showAlert(overlay.querySelector('.modal'), e.message);
+      showAlert(overlay.querySelector(".modal"), e.message);
     }
   });
 
-  overlay.querySelector('#delete-btn')?.addEventListener('click', async () => {
-    if (!confirm('Delete this event?')) return;
+  overlay.querySelector("#delete-btn")?.addEventListener("click", async () => {
+    if (!confirm("Delete this event?")) return;
     try {
       await onDelete();
       closeModal(overlay);
     } catch (e) {
-      showAlert(overlay.querySelector('.modal'), e.message);
+      showAlert(overlay.querySelector(".modal"), e.message);
     }
   });
 }
@@ -456,21 +494,22 @@ function openChurchEventModal(item, onSave, onDelete) {
 // ── Edit / create modals ──────────────────────────────────────────────────────
 
 function openEditModal(item, onSave, onDelete) {
-  if (item.type === 'Benevolence') {
+  if (item.type === "Benevolence") {
     openBenevolenceModal(item, onSave, onDelete);
     return;
   }
-  if (item.type === 'ChurchEvent') {
+  if (item.type === "ChurchEvent") {
     openChurchEventModal(item, onSave, onDelete);
     return;
   }
 
-  const typeLabel = {
-    ChurchEvent:      'Church Event',
-    FacilityUse:      'Facility Use',
-    Maintenance:      'Maintenance Request',
-    SecretaryRequest: 'Secretary Request',
-  }[item.type] || item.type;
+  const typeLabel =
+    {
+      ChurchEvent: "Church Event",
+      FacilityUse: "Facility Use",
+      Maintenance: "Maintenance Request",
+      SecretaryRequest: "Secretary Request",
+    }[item.type] || item.type;
 
   const overlay = openModal(`
     <div class="modal-header">
@@ -488,54 +527,55 @@ function openEditModal(item, onSave, onDelete) {
     </div>
   `);
 
-  overlay.querySelector('#save-btn').addEventListener('click', async () => {
-    const form = overlay.querySelector('#edit-form');
+  overlay.querySelector("#save-btn").addEventListener("click", async () => {
+    const form = overlay.querySelector("#edit-form");
     const raw = getFormData(form);
     const payload = {
       type: item.type,
-      name: raw.name || '',
+      name: raw.name || "",
       eventDate: raw.eventDate || null,
       ministry: raw.ministry || null,
       urgency: raw.urgency || null,
-      requestedBy: raw.requestedBy || '',
+      requestedBy: raw.requestedBy || "",
       email: raw.email || null,
-      description: raw.description || '',
+      description: raw.description || "",
     };
     try {
       await onSave(payload);
       closeModal(overlay);
     } catch (e) {
-      showAlert(overlay.querySelector('.modal'), e.message);
+      showAlert(overlay.querySelector(".modal"), e.message);
     }
   });
 
-  overlay.querySelector('#delete-btn').addEventListener('click', async () => {
-    if (!confirm('Delete this item?')) return;
+  overlay.querySelector("#delete-btn").addEventListener("click", async () => {
+    if (!confirm("Delete this item?")) return;
     try {
       await onDelete();
       closeModal(overlay);
     } catch (e) {
-      showAlert(overlay.querySelector('.modal'), e.message);
+      showAlert(overlay.querySelector(".modal"), e.message);
     }
   });
 }
 
 function openCreateModal(type, onSave) {
-  if (type === 'Benevolence') {
+  if (type === "Benevolence") {
     openBenevolenceModal(null, onSave, null);
     return;
   }
-  if (type === 'ChurchEvent') {
+  if (type === "ChurchEvent") {
     openChurchEventModal(null, onSave, null);
     return;
   }
 
-  const typeLabel = {
-    ChurchEvent:      'Church Event',
-    FacilityUse:      'Facility Use',
-    Maintenance:      'Maintenance Request',
-    SecretaryRequest: 'Secretary Request',
-  }[type] || type;
+  const typeLabel =
+    {
+      ChurchEvent: "Church Event",
+      FacilityUse: "Facility Use",
+      Maintenance: "Maintenance Request",
+      SecretaryRequest: "Secretary Request",
+    }[type] || type;
 
   const overlay = openModal(`
     <div class="modal-header">
@@ -552,61 +592,68 @@ function openCreateModal(type, onSave) {
     </div>
   `);
 
-  overlay.querySelector('#create-btn').addEventListener('click', async () => {
-    const form = overlay.querySelector('#create-form');
+  overlay.querySelector("#create-btn").addEventListener("click", async () => {
+    const form = overlay.querySelector("#create-form");
     const raw = getFormData(form);
     const payload = {
       type,
-      name: raw.name || '',
+      name: raw.name || "",
       eventDate: raw.eventDate || null,
       ministry: raw.ministry || null,
       urgency: raw.urgency || null,
-      requestedBy: raw.requestedBy || '',
+      requestedBy: raw.requestedBy || "",
       email: raw.email || null,
-      description: raw.description || '',
+      description: raw.description || "",
     };
     try {
       await onSave(payload);
       closeModal(overlay);
     } catch (e) {
-      showAlert(overlay.querySelector('.modal'), e.message);
+      showAlert(overlay.querySelector(".modal"), e.message);
     }
   });
 }
 
 function openBenevolenceModal(item, onSave, onDelete) {
   const isEdit = item !== null;
-  const overlay = openModal(`
+  const overlay = openModal(
+    `
     <div class="modal-header">
-      <h2>${isEdit ? 'Edit Benevolence Request' : 'New Benevolence Request'}</h2>
+      <h2>${isEdit ? "Edit Benevolence Request" : "New Benevolence Request"}</h2>
       <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       </button>
     </div>
     ${buildBenevolenceForm(item)}
     <div class="modal-actions" style="margin-top:24px;">
-      ${isEdit && onDelete ? '<button class="btn btn-danger" id="delete-btn">Delete</button>' : ''}
+      ${isEdit && onDelete ? '<button class="btn btn-danger" id="delete-btn">Delete</button>' : ""}
       <button class="btn" id="print-btn" style="background:#f0f4f9;color:var(--secondary);margin-right:auto;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Print
       </button>
-      <button class="btn btn-primary" id="save-btn">${isEdit ? 'Save' : 'Create'}</button>
+      <button class="btn btn-primary" id="save-btn">${isEdit ? "Save" : "Create"}</button>
     </div>
-  `, true);
+  `,
+    true,
+  );
 
   setupDeterminationToggle(overlay);
 
-  overlay.querySelector('#save-btn').addEventListener('click', async () => {
-    const applicant = overlay.querySelector('#b-applicant')?.value.trim() || '';
-    const description = overlay.querySelector('#b-description')?.value.trim() || '';
+  overlay.querySelector("#save-btn").addEventListener("click", async () => {
+    const applicant = overlay.querySelector("#b-applicant")?.value.trim() || "";
+    const description =
+      overlay.querySelector("#b-description")?.value.trim() || "";
 
     if (!applicant) {
-      showAlert(overlay.querySelector('.modal'), 'Name of Applicant is required.');
+      showAlert(
+        overlay.querySelector(".modal"),
+        "Name of Applicant is required.",
+      );
       return;
     }
 
     const payload = {
-      type: 'Benevolence',
+      type: "Benevolence",
       name: applicant,
       eventDate: null,
       ministry: null,
@@ -620,24 +667,25 @@ function openBenevolenceModal(item, onSave, onDelete) {
       await onSave(payload);
       closeModal(overlay);
     } catch (e) {
-      showAlert(overlay.querySelector('.modal'), e.message);
+      showAlert(overlay.querySelector(".modal"), e.message);
     }
   });
 
-  overlay.querySelector('#print-btn').addEventListener('click', () => {
-    const applicant = overlay.querySelector('#b-applicant')?.value.trim() || '';
-    const description = overlay.querySelector('#b-description')?.value.trim() || '';
+  overlay.querySelector("#print-btn").addEventListener("click", () => {
+    const applicant = overlay.querySelector("#b-applicant")?.value.trim() || "";
+    const description =
+      overlay.querySelector("#b-description")?.value.trim() || "";
     const data = collectBenevolenceData(overlay);
     printBenevolenceForm(applicant, description, data);
   });
 
-  overlay.querySelector('#delete-btn')?.addEventListener('click', async () => {
-    if (!confirm('Delete this benevolence request?')) return;
+  overlay.querySelector("#delete-btn")?.addEventListener("click", async () => {
+    if (!confirm("Delete this benevolence request?")) return;
     try {
       await onDelete();
       closeModal(overlay);
     } catch (e) {
-      showAlert(overlay.querySelector('.modal'), e.message);
+      showAlert(overlay.querySelector(".modal"), e.message);
     }
   });
 }
@@ -657,41 +705,55 @@ function openReceiptModal(receiptId) {
     </div>
   `);
 
-  const container = overlay.querySelector('#receipt-image-container');
+  const container = overlay.querySelector("#receipt-image-container");
 
   fetch(Receipts.imageUrl(receiptId), {
     headers: {
-      'Authorization': `Bearer ${getToken()}`,
-      'ngrok-skip-browser-warning': 'true',
-    }
-  }).then(async res => {
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const contentType = res.headers.get('Content-Type') || '';
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    if (contentType.includes('pdf')) {
-      container.innerHTML = `<iframe src="${url}"></iframe>`;
-    } else {
-      container.innerHTML = `<img src="${url}" alt="Receipt">`;
-    }
-  }).catch(() => {
-    container.innerHTML = `<p style="color:var(--urgency-urgent-text)">Failed to load receipt image.</p>`;
-  });
+      Authorization: `Bearer ${getToken()}`,
+      "ngrok-skip-browser-warning": "true",
+    },
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const contentType = res.headers.get("Content-Type") || "";
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (contentType.includes("pdf")) {
+        container.innerHTML = `<iframe src="${url}"></iframe>`;
+      } else {
+        container.innerHTML = `<img src="${url}" alt="Receipt">`;
+      }
+    })
+    .catch(() => {
+      container.innerHTML = `<p style="color:var(--urgency-urgent-text)">Failed to load receipt image.</p>`;
+    });
 }
 
 // ── Print church event form ───────────────────────────────────────────────────
 
-function printChurchEventForm(name, ministry, contact, date, description, data) {
-  const e = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const fmtDate = (val) => val ? new Date(val + 'T00:00:00').toLocaleDateString('en-US') : '';
+function printChurchEventForm(
+  name,
+  ministry,
+  contact,
+  date,
+  description,
+  data,
+) {
+  const e = (str) =>
+    String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const fmtDate = (val) =>
+    val ? new Date(val + "T00:00:00").toLocaleDateString("en-US") : "";
   const fmtTime = (val) => {
-    if (!val) return '';
-    const [h, m] = val.split(':');
+    if (!val) return "";
+    const [h, m] = val.split(":");
     const hour = parseInt(h);
-    return `${hour % 12 || 12}:${m} ${hour < 12 ? 'AM' : 'PM'}`;
+    return `${hour % 12 || 12}:${m} ${hour < 12 ? "AM" : "PM"}`;
   };
-  const fmtMoney = (val) => val ? `$${parseFloat(val).toFixed(2)}` : '';
-  const check = (condition) => condition ? '☑' : '☐';
+  const fmtMoney = (val) => (val ? `$${parseFloat(val).toFixed(2)}` : "");
+  const check = (condition) => (condition ? "☑" : "☐");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -764,7 +826,7 @@ function printChurchEventForm(name, ministry, contact, date, description, data) 
 </body>
 </html>`;
 
-  const win = window.open('', '_blank');
+  const win = window.open("", "_blank");
   win.document.write(html);
   win.document.close();
 }
@@ -772,15 +834,20 @@ function printChurchEventForm(name, ministry, contact, date, description, data) 
 // ── Print benevolence form ────────────────────────────────────────────────────
 
 function printBenevolenceForm(applicant, description, data) {
-  const e = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const fmt = (val) => val ? e(val) : '';
-  const fmtDate = (val) => val ? new Date(val + 'T00:00:00').toLocaleDateString('en-US') : '';
-  const fmtMoney = (val) => val ? `$${parseFloat(val).toFixed(2)}` : '';
-  const check = (condition) => condition ? '☑' : '☐';
+  const e = (str) =>
+    String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const fmt = (val) => (val ? e(val) : "");
+  const fmtDate = (val) =>
+    val ? new Date(val + "T00:00:00").toLocaleDateString("en-US") : "";
+  const fmtMoney = (val) => (val ? `$${parseFloat(val).toFixed(2)}` : "");
+  const check = (condition) => (condition ? "☑" : "☐");
 
-  const det = data.determination || '';
-  const method = data.methodOfAssistance || '';
-  const showApproval = det === 'ApprovedFull' || det === 'ApprovedPart';
+  const det = data.determination || "";
+  const method = data.methodOfAssistance || "";
+  const showApproval = det === "ApprovedFull" || det === "ApprovedPart";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -868,9 +935,9 @@ function printBenevolenceForm(applicant, description, data) {
 
     <div style="font-weight:bold;margin:10px 0 6px;">DETERMINATION</div>
     <div class="determination">
-      <div>${check(det === 'ApprovedFull')} Request Approved in Full</div>
-      <div>${check(det === 'ApprovedPart')} Request Approved in Part</div>
-      <div>${check(det === 'NotApproved')} Request Not Approved</div>
+      <div>${check(det === "ApprovedFull")} Request Approved in Full</div>
+      <div>${check(det === "ApprovedPart")} Request Approved in Part</div>
+      <div>${check(det === "NotApproved")} Request Not Approved</div>
     </div>
 
     <div class="field" style="margin-top:10px;">
@@ -878,7 +945,9 @@ function printBenevolenceForm(applicant, description, data) {
       <div class="value multiline">${fmt(data.denialReason)}</div>
     </div>
 
-    ${showApproval ? `
+    ${
+      showApproval
+        ? `
     <div class="field">
       <label>Brief description of assistance provided by the church</label>
       <div class="value multiline">${fmt(data.assistanceProvidedDescription)}</div>
@@ -888,15 +957,17 @@ function printBenevolenceForm(applicant, description, data) {
     </div>
     <div style="font-weight:bold;margin:8px 0 4px;font-size:10pt;">Method of Assistance:</div>
     <div class="determination">
-      <div>${check(method === 'DirectPayment')} Payment Directly to Provider/Business</div>
-      <div>${check(method === 'CashGrant')} Cash Grant</div>
-      <div style="display:flex;gap:8px;align-items:baseline;">${check(method === 'Other')} Other: <span style="border-bottom:1px solid #000;flex:1;min-width:120px;">${method === 'Other' ? fmt(data.methodOtherDescription) : ''}</span></div>
+      <div>${check(method === "DirectPayment")} Payment Directly to Provider/Business</div>
+      <div>${check(method === "CashGrant")} Cash Grant</div>
+      <div style="display:flex;gap:8px;align-items:baseline;">${check(method === "Other")} Other: <span style="border-bottom:1px solid #000;flex:1;min-width:120px;">${method === "Other" ? fmt(data.methodOtherDescription) : ""}</span></div>
     </div>
     <div class="row" style="margin-top:10px;">
       <div class="field"><label>Payable To/Provider Name</label><div class="value">${fmt(data.payableTo)}</div></div>
       <div class="field"><label>Date Assistance Provided</label><div class="value">${fmtDate(data.dateAssistanceProvided)}</div></div>
     </div>
-    ` : ''}
+    `
+        : ""
+    }
   </div>
 
   <div class="guidelines">
@@ -912,7 +983,7 @@ function printBenevolenceForm(applicant, description, data) {
 </body>
 </html>`;
 
-  const win = window.open('', '_blank');
+  const win = window.open("", "_blank");
   win.document.write(html);
   win.document.close();
 }
@@ -920,5 +991,9 @@ function printBenevolenceForm(applicant, description, data) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function escModalHtml(str) {
-  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

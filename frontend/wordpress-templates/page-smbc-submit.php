@@ -80,7 +80,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
           </div>
           <div class="field">
             <label>Cost</label>
-            <input type="text" id="ce-cost" placeholder="e.g. Free or $5/person">
+            <input type="number" id="bn-amount" step="1.00" min="0" placeholder="0.00">
           </div>
         </div>
         <div class="field">
@@ -167,7 +167,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
         <div class="form-row">
           <div class="field">
             <label>Amount Requested</label>
-            <input type="number" id="bn-amount" step="0.01" min="0" placeholder="0.00">
+            <input type="number" id="bn-amount" step="1.00" min="0" placeholder="0.00">
           </div>
           <div class="field">
             <label>Date Needed</label>
@@ -265,7 +265,7 @@ $smbc = site_url('/wp-content/themes/smbc-admin/smbc');
         <div class="form-row">
           <div class="field">
             <label>Amount <span style="color:#dc2626">*</span></label>
-            <input type="number" id="rc-amount" step="0.01" min="0" placeholder="0.00">
+            <input type="number" id="rc-amount" step="1.00" min="0" placeholder="0.00">
           </div>
           <div class="field">
             <label>Submitted By <span style="color:#dc2626">*</span></label>
