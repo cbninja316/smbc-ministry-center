@@ -8,7 +8,7 @@ using SmbcStatusBoard.Api.Services;
 namespace SmbcStatusBoard.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/event-photos")]
 [Authorize]
 public class EventPhotosController(AppDbContext db, FileStorageService storage) : ControllerBase
 {
