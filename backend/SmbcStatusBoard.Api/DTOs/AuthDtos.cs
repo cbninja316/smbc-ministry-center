@@ -7,3 +7,9 @@ public record LoginResponse(string Token, string Username, string Role, string[]
 public record SetPasswordRequest(string Token, string Password);
 
 public record InviteUserRequest(string Email, string Username, string Role, string[] AllowedItemTypes);
+
+public record ForgotPasswordRequest(string Email);
+
+public record ResetPasswordRequest(string Token, string Password);
+
+public record ChangePasswordRequest(string NewPassword);

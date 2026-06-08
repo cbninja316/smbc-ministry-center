@@ -66,6 +66,41 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
+    public async Task SendPasswordResetAsync(string toEmail, string toName, string resetLink)
+    {
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.Subject = "Reset Your One Accord Password";
+
+        message.Body = new TextPart("html")
+        {
+            Text = $"""
+                <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
+                  <h2 style="color: #005DBA;">Reset Your Password</h2>
+                  <p>We received a request to reset the password for your One Accord account (<strong>{System.Net.WebUtility.HtmlEncode(toName)}</strong>).</p>
+                  <p>Click the button below to choose a new password. This link expires in 1 hour.</p>
+                  <a href="{resetLink}" style="display:inline-block;padding:12px 24px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Reset My Password</a>
+                  <p style="color:#888;font-size:12px;margin-top:24px;">If you did not request a password reset, you can safely ignore this email.</p>
+                </div>
+                """
+        };
+
+        using var client = new SmtpClient();
+        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
+        {
+            if (errors == SslPolicyErrors.None) return true;
+            if (chain == null) return false;
+            return chain.ChainStatus.All(s =>
+                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
+                s.Status == X509ChainStatusFlags.OfflineRevocation);
+        };
+        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
+        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        await client.SendAsync(message);
+        await client.DisconnectAsync(true);
+    }
+
     public async Task SendInviteAsync(string toEmail, string toName, string inviteLink)
     {
         var message = new MimeMessage();

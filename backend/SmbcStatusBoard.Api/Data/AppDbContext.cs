@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Item> Items => Set<Item>();
     public DbSet<Receipt> Receipts => Set<Receipt>();
     public DbSet<InviteToken> InviteTokens => Set<InviteToken>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +24,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<InviteToken>()
             .HasOne(t => t.User)
             .WithMany(u => u.InviteTokens)
+            .HasForeignKey(t => t.UserId);
+
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasOne(t => t.User)
+            .WithMany(u => u.PasswordResetTokens)
             .HasForeignKey(t => t.UserId);
 
         modelBuilder.Entity<Receipt>()
