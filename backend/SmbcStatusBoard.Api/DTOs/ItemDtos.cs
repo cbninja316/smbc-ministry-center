@@ -6,6 +6,7 @@ public record ItemRequest(
     ItemType Type,
     string Name,
     DateTime? EventDate,
+    DateTime? EventEndDate,
     string? Ministry,
     Urgency? Urgency,
     string RequestedBy,
@@ -17,7 +18,9 @@ public record ItemRequest(
 
 public class ChurchEventData
 {
-    public string? EventTime { get; set; }
+    public string? EventTime { get; set; }  // legacy: kept for backward compat
+    public string? StartTime { get; set; }
+    public string? EndTime { get; set; }
     public string? Location { get; set; }
     public decimal? Cost { get; set; }
     public bool RegistrationRequired { get; set; }

@@ -75,6 +75,7 @@ public class ItemsController(AppDbContext db, FileStorageService storage) : Cont
             Type = req.Type,
             Name = req.Name,
             EventDate = req.EventDate,
+            EventEndDate = req.EventEndDate,
             Ministry = req.Ministry,
             Urgency = req.Urgency,
             RequestedBy = req.RequestedBy,
@@ -104,6 +105,7 @@ public class ItemsController(AppDbContext db, FileStorageService storage) : Cont
 
         item.Name = req.Name;
         item.EventDate = req.EventDate;
+        item.EventEndDate = req.EventEndDate;
         item.Ministry = req.Ministry;
         item.Urgency = req.Urgency;
         item.RequestedBy = req.RequestedBy;
@@ -167,10 +169,11 @@ public class ItemsController(AppDbContext db, FileStorageService storage) : Cont
 
         foreach (var item in items)
         {
-            var eventDate = item.EventDate!.Value.Date;
-            if (eventDate <= now && item.Status == ItemStatus.ToDo)
+            var startDate = item.EventDate!.Value.Date;
+            var endDate = (item.EventEndDate ?? item.EventDate)!.Value.Date;
+            if (startDate <= now && item.Status == ItemStatus.ToDo)
                 item.Status = ItemStatus.InProgress;
-            if (eventDate < now && item.Status == ItemStatus.InProgress)
+            if (endDate < now && item.Status == ItemStatus.InProgress)
                 item.Status = ItemStatus.Done;
         }
 

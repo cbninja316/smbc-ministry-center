@@ -24,6 +24,7 @@ public class Item
     public ItemType Type { get; set; }
     public string Name { get; set; } = string.Empty;
     public DateTime? EventDate { get; set; }
+    public DateTime? EventEndDate { get; set; }
     public string? Ministry { get; set; }
     public Urgency? Urgency { get; set; }
     public string RequestedBy { get; set; } = string.Empty;
