@@ -13,6 +13,8 @@ public class User
     public string AllowedItemTypes { get; set; } = string.Empty; // comma-separated
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public string? PreferencesJson { get; set; }
+
     public ICollection<InviteToken> InviteTokens { get; set; } = new List<InviteToken>();
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
 }
