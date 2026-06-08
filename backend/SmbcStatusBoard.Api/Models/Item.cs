@@ -45,6 +45,8 @@ public class Item
     [JsonIgnore]
     public string? ChurchEventData { get; set; }
 
+    public ICollection<EventPhoto> EventPhotos { get; set; } = new List<EventPhoto>();
+
     [NotMapped]
     public ChurchEventData? ChurchEventDetails =>
         ChurchEventData != null

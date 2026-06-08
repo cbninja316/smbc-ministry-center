@@ -6,13 +6,14 @@ using Microsoft.EntityFrameworkCore;
 using SmbcStatusBoard.Api.Data;
 using SmbcStatusBoard.Api.DTOs;
 using SmbcStatusBoard.Api.Models;
+using SmbcStatusBoard.Api.Services;
 
 namespace SmbcStatusBoard.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class ItemsController(AppDbContext db) : ControllerBase
+public class ItemsController(AppDbContext db, FileStorageService storage) : ControllerBase
 {
     private string[] GetAllowedTypes() =>
         User.FindFirst("AllowedItemTypes")?.Value
@@ -125,6 +126,10 @@ public class ItemsController(AppDbContext db) : ControllerBase
         var item = await db.Items.FindAsync(id);
         if (item is null) return NotFound();
         if (!CanAccessType(item.Type)) return Forbid();
+
+        // Delete event photos from disk when a ChurchEvent is removed
+        if (item.Type == ItemType.ChurchEvent)
+            storage.DeleteEventPhotosFolder(id);
 
         db.Items.Remove(item);
         await db.SaveChangesAsync();

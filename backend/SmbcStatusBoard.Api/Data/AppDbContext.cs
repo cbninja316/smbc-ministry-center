@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Receipt> Receipts => Set<Receipt>();
     public DbSet<InviteToken> InviteTokens => Set<InviteToken>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<EventPhoto> EventPhotos => Set<EventPhoto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +31,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasOne(t => t.User)
             .WithMany(u => u.PasswordResetTokens)
             .HasForeignKey(t => t.UserId);
+
+        modelBuilder.Entity<EventPhoto>()
+            .HasOne(p => p.Item)
+            .WithMany(i => i.EventPhotos)
+            .HasForeignKey(p => p.ItemId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Receipt>()
             .Property(r => r.Amount)
