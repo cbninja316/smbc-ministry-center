@@ -133,7 +133,7 @@ public class ItemsController(AppDbContext db, FileStorageService storage) : Cont
             var photos = await db.EventPhotos.Where(p => p.ItemId == id).ToListAsync();
             db.EventPhotos.RemoveRange(photos);
             await db.SaveChangesAsync();
-            storage.DeleteEventPhotosFolder(id);
+            try { storage.DeleteEventPhotosFolder(id); } catch { /* best-effort; don't block item delete */ }
         }
 
         db.Items.Remove(item);

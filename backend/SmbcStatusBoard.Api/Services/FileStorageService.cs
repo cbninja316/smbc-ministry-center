@@ -42,7 +42,13 @@ public class FileStorageService(IConfiguration config)
     {
         var folder = Path.Combine(EventPhotosPath, itemId.ToString());
         if (Directory.Exists(folder))
+        {
+            // Clear read-only/archive attributes on all files before deleting
+            // (OneDrive sometimes sets these and blocks Directory.Delete)
+            foreach (var f in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+                File.SetAttributes(f, FileAttributes.Normal);
             Directory.Delete(folder, recursive: true);
+        }
     }
 
     // ── Receipts ─────────────────────────────────────────────────────────────
