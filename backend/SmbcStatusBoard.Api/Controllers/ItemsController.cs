@@ -127,9 +127,14 @@ public class ItemsController(AppDbContext db, FileStorageService storage) : Cont
         if (item is null) return NotFound();
         if (!CanAccessType(item.Type)) return Forbid();
 
-        // Delete event photos from disk when a ChurchEvent is removed
+        // Delete event photos (DB records + disk files) when a ChurchEvent is removed
         if (item.Type == ItemType.ChurchEvent)
+        {
+            var photos = await db.EventPhotos.Where(p => p.ItemId == id).ToListAsync();
+            db.EventPhotos.RemoveRange(photos);
+            await db.SaveChangesAsync();
             storage.DeleteEventPhotosFolder(id);
+        }
 
         db.Items.Remove(item);
         await db.SaveChangesAsync();
