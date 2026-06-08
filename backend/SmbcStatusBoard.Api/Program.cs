@@ -40,9 +40,16 @@ builder.Services.AddCors(opt =>
     {
         var frontendUrl = builder.Configuration["App:FrontendUrl"]!;
         if (frontendUrl == "*")
+        {
             policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
         else
-            policy.WithOrigins(frontendUrl).AllowAnyHeader().AllowAnyMethod();
+        {
+            // Support comma-separated list of allowed origins
+            var origins = frontendUrl
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
+        }
     }));
 
 var app = builder.Build();
