@@ -11,6 +11,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<InviteToken> InviteTokens => Set<InviteToken>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<EventPhoto> EventPhotos => Set<EventPhoto>();
+    public DbSet<VolunteerRole> VolunteerRoles => Set<VolunteerRole>();
+    public DbSet<VolunteerAssignment> VolunteerAssignments => Set<VolunteerAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,5 +43,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Receipt>()
             .Property(r => r.Amount)
             .HasColumnType("TEXT");
+
+        modelBuilder.Entity<VolunteerAssignment>()
+            .HasOne(a => a.Role)
+            .WithMany(r => r.Assignments)
+            .HasForeignKey(a => a.RoleId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<VolunteerAssignment>()
+            .HasOne(a => a.User)
+            .WithMany()
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<VolunteerAssignment>()
+            .HasIndex(a => a.ResponseToken)
+            .IsUnique();
     }
 }

@@ -12,7 +12,7 @@ namespace SmbcStatusBoard.Api.Controllers;
 [ApiController]
 [Route("api/public")]
 [AllowAnonymous]
-public class PublicController(AppDbContext db, FileStorageService storage, EmailService emailService) : ControllerBase
+public class PublicController(AppDbContext db, FileStorageService storage, EmailService emailService, IConfiguration config) : ControllerBase
 {
     // POST /api/public/items — anonymous item submission
     [HttpPost("items")]
@@ -159,6 +159,48 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
         }
 
         return Ok(new { message = "Submitted successfully." });
+    }
+
+    // GET /api/public/volunteer-respond?token=XXX&response=accept|reject
+    [HttpGet("volunteer-respond")]
+    public async Task<IActionResult> VolunteerRespond([FromQuery] string token, [FromQuery] string response)
+    {
+        var assignment = await db.VolunteerAssignments
+            .Include(a => a.Role)
+            .Include(a => a.User)
+            .FirstOrDefaultAsync(a => a.ResponseToken == token);
+
+        var frontendBase = config["App:NextFrontendUrl"] ?? "https://oneaccord.southmoorebc.org";
+
+        if (assignment is null)
+            return Redirect($"{frontendBase}/volunteer-respond-complete?response=invalid");
+
+        bool accepted = response?.ToLower() == "accept";
+        assignment.Status = accepted ? SmbcStatusBoard.Api.Models.AssignmentStatus.Accepted : SmbcStatusBoard.Api.Models.AssignmentStatus.Rejected;
+        await db.SaveChangesAsync();
+
+        try
+        {
+            var recipients = await db.Users
+                .Where(u => u.IsActive && (
+                    u.Role == UserRole.SuperAdmin ||
+                    u.AllowedItemTypes.Contains("AssignVolunteers")))
+                .Select(u => new { u.Email, u.Username })
+                .ToListAsync();
+
+            await emailService.SendVolunteerResponseAsync(
+                recipients.Select(r => (r.Email, r.Username)).ToList(),
+                assignment.User.Username,
+                assignment.Role.Label,
+                assignment.SundayDate.ToString("MMMM d, yyyy"),
+                accepted);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email] Failed to send volunteer response notification: {ex.Message}");
+        }
+
+        return Redirect($"{frontendBase}/volunteer-respond-complete?response={response}");
     }
 
     // POST /api/public/receipts — anonymous receipt submission
