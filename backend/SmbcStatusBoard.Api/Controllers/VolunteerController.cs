@@ -114,9 +114,9 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
         // Send email to volunteer
         try
         {
-            var apiBase = config["App:ApiBaseUrl"] ?? "http://localhost:5000";
-            var acceptUrl = $"{apiBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=accept";
-            var rejectUrl = $"{apiBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=reject";
+            var frontendBase = config["App:NextFrontendUrl"] ?? "http://localhost:3000";
+            var acceptUrl = $"{frontendBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=accept";
+            var rejectUrl = $"{frontendBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=reject";
             await emailService.SendVolunteerRequestAsync(
                 user.Email, user.Username, role.Label, role.Description,
                 assignment.SundayDate.ToString("MMMM d, yyyy"),
