@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EventPhoto> EventPhotos => Set<EventPhoto>();
     public DbSet<VolunteerRole> VolunteerRoles => Set<VolunteerRole>();
     public DbSet<VolunteerAssignment> VolunteerAssignments => Set<VolunteerAssignment>();
+    public DbSet<SpecialEvent> SpecialEvents => Set<SpecialEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
