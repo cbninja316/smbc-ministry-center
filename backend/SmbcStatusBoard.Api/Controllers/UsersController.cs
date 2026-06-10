@@ -14,8 +14,17 @@ namespace SmbcStatusBoard.Api.Controllers;
 public class UsersController(AppDbContext db, EmailService emailService, IConfiguration config) : ControllerBase
 {
     [HttpGet]
+    [AllowAnonymous] // auth checked manually below so AssignVolunteers users can also call this
     public async Task<IActionResult> GetAll()
     {
+        // SuperAdmin gets full list; AssignVolunteers gets active users only (for volunteer picker)
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        var allowed = User.FindFirst("AllowedItemTypes")?.Value ?? "";
+        var canAssign = role == "SuperAdmin" || allowed.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains("AssignVolunteers");
+
+        if (!canAssign)
+            return Forbid();
+
         var users = await db.Users.Select(u => new
         {
             u.Id,
