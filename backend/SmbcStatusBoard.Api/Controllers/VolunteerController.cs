@@ -21,17 +21,27 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
         return allowed.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains("AssignVolunteers");
     }
 
+    private static VolunteerRoleResponse ToRoleResponse(VolunteerRole r) => new()
+    {
+        Id = r.Id, Label = r.Label, Description = r.Description,
+        SortOrder = r.SortOrder, SpecialEventId = r.SpecialEventId,
+        TimeSlots = r.TimeSlots.OrderBy(t => t.SortOrder).Select(t => new TimeSlotResponse
+        {
+            Id = t.Id, Time = t.Time, Label = t.Label, SortOrder = t.SortOrder
+        }).ToList()
+    };
+
     // GET /api/volunteer-roles?specialEventId=X  (omit param for Sunday roles)
     [HttpGet("volunteer-roles")]
     public async Task<IActionResult> GetRoles([FromQuery] int? specialEventId)
     {
         if (!CanManageVolunteers()) return Forbid();
         var roles = await db.VolunteerRoles
+            .Include(r => r.TimeSlots)
             .Where(r => r.SpecialEventId == specialEventId)
             .OrderBy(r => r.SortOrder)
-            .Select(r => new VolunteerRoleResponse { Id = r.Id, Label = r.Label, Description = r.Description, SortOrder = r.SortOrder, SpecialEventId = r.SpecialEventId })
             .ToListAsync();
-        return Ok(roles);
+        return Ok(roles.Select(ToRoleResponse));
     }
 
     // POST /api/volunteer-roles
@@ -39,11 +49,36 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
     public async Task<IActionResult> CreateRole([FromBody] CreateRoleRequest req)
     {
         if (!CanManageVolunteers()) return Forbid();
+        if (string.IsNullOrWhiteSpace(req.Label)) return BadRequest(new { message = "Label is required." });
         var count = await db.VolunteerRoles.CountAsync(r => r.SpecialEventId == req.SpecialEventId);
-        var role = new VolunteerRole { Label = req.Label, Description = req.Description, SortOrder = count, SpecialEventId = req.SpecialEventId };
+        var role = new VolunteerRole { Label = req.Label, Description = req.Description ?? "", SortOrder = count, SpecialEventId = req.SpecialEventId };
+        if (req.TimeSlots != null)
+            for (int i = 0; i < req.TimeSlots.Count; i++)
+                role.TimeSlots.Add(new RoleTimeSlot { Time = req.TimeSlots[i].Time, Label = req.TimeSlots[i].Label, SortOrder = i });
         db.VolunteerRoles.Add(role);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetRoles), new VolunteerRoleResponse { Id = role.Id, Label = role.Label, Description = role.Description, SortOrder = role.SortOrder, SpecialEventId = role.SpecialEventId });
+        await db.Entry(role).Collection(r => r.TimeSlots).LoadAsync();
+        return CreatedAtAction(nameof(GetRoles), ToRoleResponse(role));
+    }
+
+    // PUT /api/volunteer-roles/{id}
+    [HttpPut("volunteer-roles/{id}")]
+    public async Task<IActionResult> UpdateRole(int id, [FromBody] UpdateRoleRequest req)
+    {
+        if (!CanManageVolunteers()) return Forbid();
+        if (string.IsNullOrWhiteSpace(req.Label)) return BadRequest(new { message = "Label is required." });
+        var role = await db.VolunteerRoles.Include(r => r.TimeSlots).FirstOrDefaultAsync(r => r.Id == id);
+        if (role is null) return NotFound();
+        role.Label = req.Label;
+        role.Description = req.Description ?? "";
+        // Replace time slots
+        db.RoleTimeSlots.RemoveRange(role.TimeSlots);
+        role.TimeSlots.Clear();
+        if (req.TimeSlots != null)
+            for (int i = 0; i < req.TimeSlots.Count; i++)
+                role.TimeSlots.Add(new RoleTimeSlot { Time = req.TimeSlots[i].Time, Label = req.TimeSlots[i].Label, SortOrder = i });
+        await db.SaveChangesAsync();
+        return Ok(ToRoleResponse(role));
     }
 
     // DELETE /api/volunteer-roles/{id}
@@ -53,7 +88,6 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
         if (!CanManageVolunteers()) return Forbid();
         var role = await db.VolunteerRoles.FindAsync(id);
         if (role is null) return NotFound();
-
         var today = DateTime.UtcNow.Date;
         var futureAssignments = await db.VolunteerAssignments
             .Where(a => a.RoleId == id && a.SundayDate >= today)

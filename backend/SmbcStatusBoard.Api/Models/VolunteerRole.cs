@@ -8,4 +8,5 @@ public class VolunteerRole {
     public SpecialEvent? SpecialEvent { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<VolunteerAssignment> Assignments { get; set; } = new List<VolunteerAssignment>();
+    public ICollection<RoleTimeSlot> TimeSlots { get; set; } = new List<RoleTimeSlot>();
 }

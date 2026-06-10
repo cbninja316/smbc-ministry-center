@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EventPhoto> EventPhotos => Set<EventPhoto>();
     public DbSet<VolunteerRole> VolunteerRoles => Set<VolunteerRole>();
     public DbSet<VolunteerAssignment> VolunteerAssignments => Set<VolunteerAssignment>();
+    public DbSet<RoleTimeSlot> RoleTimeSlots => Set<RoleTimeSlot>();
     public DbSet<SpecialEvent> SpecialEvents => Set<SpecialEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -64,5 +65,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(r => r.SpecialEventId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<RoleTimeSlot>()
+            .HasOne(t => t.Role)
+            .WithMany(r => r.TimeSlots)
+            .HasForeignKey(t => t.RoleId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
