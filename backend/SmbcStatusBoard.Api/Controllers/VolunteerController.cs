@@ -21,14 +21,15 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
         return allowed.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains("AssignVolunteers");
     }
 
-    // GET /api/volunteer-roles
+    // GET /api/volunteer-roles?specialEventId=X  (omit param for Sunday roles)
     [HttpGet("volunteer-roles")]
-    public async Task<IActionResult> GetRoles()
+    public async Task<IActionResult> GetRoles([FromQuery] int? specialEventId)
     {
         if (!CanManageVolunteers()) return Forbid();
         var roles = await db.VolunteerRoles
+            .Where(r => r.SpecialEventId == specialEventId)
             .OrderBy(r => r.SortOrder)
-            .Select(r => new VolunteerRoleResponse { Id = r.Id, Label = r.Label, Description = r.Description, SortOrder = r.SortOrder })
+            .Select(r => new VolunteerRoleResponse { Id = r.Id, Label = r.Label, Description = r.Description, SortOrder = r.SortOrder, SpecialEventId = r.SpecialEventId })
             .ToListAsync();
         return Ok(roles);
     }
@@ -38,11 +39,11 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
     public async Task<IActionResult> CreateRole([FromBody] CreateRoleRequest req)
     {
         if (!CanManageVolunteers()) return Forbid();
-        var count = await db.VolunteerRoles.CountAsync();
-        var role = new VolunteerRole { Label = req.Label, Description = req.Description, SortOrder = count };
+        var count = await db.VolunteerRoles.CountAsync(r => r.SpecialEventId == req.SpecialEventId);
+        var role = new VolunteerRole { Label = req.Label, Description = req.Description, SortOrder = count, SpecialEventId = req.SpecialEventId };
         db.VolunteerRoles.Add(role);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetRoles), new VolunteerRoleResponse { Id = role.Id, Label = role.Label, Description = role.Description, SortOrder = role.SortOrder });
+        return CreatedAtAction(nameof(GetRoles), new VolunteerRoleResponse { Id = role.Id, Label = role.Label, Description = role.Description, SortOrder = role.SortOrder, SpecialEventId = role.SpecialEventId });
     }
 
     // DELETE /api/volunteer-roles/{id}

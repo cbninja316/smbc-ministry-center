@@ -58,5 +58,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<VolunteerAssignment>()
             .HasIndex(a => a.ResponseToken)
             .IsUnique();
+
+        modelBuilder.Entity<VolunteerRole>()
+            .HasOne(r => r.SpecialEvent)
+            .WithMany()
+            .HasForeignKey(r => r.SpecialEventId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
