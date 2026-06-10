@@ -185,10 +185,28 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
     public async Task<IActionResult> DeleteAssignment(int id)
     {
         if (!CanManageVolunteers()) return Forbid();
-        var assignment = await db.VolunteerAssignments.FindAsync(id);
+        var assignment = await db.VolunteerAssignments
+            .Include(a => a.Role)
+            .Include(a => a.User)
+            .FirstOrDefaultAsync(a => a.Id == id);
         if (assignment is null) return NotFound();
+
         db.VolunteerAssignments.Remove(assignment);
         await db.SaveChangesAsync();
+
+        try
+        {
+            await emailService.SendVolunteerCancellationAsync(
+                assignment.User.Email,
+                assignment.User.Username,
+                assignment.Role.Label,
+                assignment.SundayDate.ToString("MMMM d, yyyy"));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email] Failed to send cancellation: {ex.Message}");
+        }
+
         return NoContent();
     }
 }

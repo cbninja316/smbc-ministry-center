@@ -175,6 +175,53 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
+    public async Task SendVolunteerCancellationAsync(string recipientEmail, string recipientName, string roleLabel, string sundayDate)
+    {
+        var html = $"""
+            <div style="font-family:sans-serif;max-width:560px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
+              <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+                <div style="background:#dc2626;padding:20px 28px;">
+                  <h2 style="margin:0;color:#fff;font-size:1.2rem;">Volunteer Request Cancelled</h2>
+                </div>
+                <div style="padding:24px 28px;">
+                  <p style="margin:0 0 12px;color:#111827;">Hi <strong>{System.Net.WebUtility.HtmlEncode(recipientName)}</strong>,</p>
+                  <p style="margin:0 0 20px;color:#374151;">Your request to serve has been cancelled for the following:</p>
+                  <table style="width:100%;border-collapse:collapse;font-size:0.9rem;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:24px;">
+                    <tr>
+                      <td style="padding:8px 12px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Role</td>
+                      <td style="padding:8px 12px;color:#111827;border-bottom:1px solid #e5e7eb;">{System.Net.WebUtility.HtmlEncode(roleLabel)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 12px;font-weight:600;color:#374151;">Date</td>
+                      <td style="padding:8px 12px;color:#111827;">{System.Net.WebUtility.HtmlEncode(sundayDate)}</td>
+                    </tr>
+                  </table>
+                  <p style="margin:0;color:#6b7280;font-size:0.85rem;">If you have any questions, please contact your church coordinator.</p>
+                </div>
+              </div>
+            </div>
+            """;
+
+        using var client = new SmtpClient();
+        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
+        {
+            if (errors == SslPolicyErrors.None) return true;
+            if (chain == null) return false;
+            return chain.ChainStatus.All(s =>
+                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
+                s.Status == X509ChainStatusFlags.OfflineRevocation);
+        };
+        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
+        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.To.Add(new MailboxAddress(recipientName, recipientEmail));
+        message.Subject = $"Volunteer Request Cancelled: {roleLabel} on {sundayDate}";
+        message.Body = new TextPart("html") { Text = html };
+        await client.SendAsync(message);
+        await client.DisconnectAsync(true);
+    }
+
     public async Task SendVolunteerResponseAsync(List<(string Email, string Name)> recipients, string volunteerName, string roleLabel, string sundayDate, bool accepted)
     {
         if (recipients.Count == 0) return;
