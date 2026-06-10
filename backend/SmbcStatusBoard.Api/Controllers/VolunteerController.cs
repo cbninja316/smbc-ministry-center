@@ -114,7 +114,7 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
         // Send email to volunteer
         try
         {
-            var apiBase = config["App:SiteUrl"] ?? "https://southmoorebc.org";
+            var apiBase = config["App:ApiBaseUrl"] ?? "http://localhost:5000";
             var acceptUrl = $"{apiBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=accept";
             var rejectUrl = $"{apiBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=reject";
             await emailService.SendVolunteerRequestAsync(
