@@ -101,8 +101,26 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendVolunteerRequestAsync(string recipientEmail, string recipientName, string roleLabel, string roleDescription, string sundayDate, string acceptUrl, string rejectUrl)
+    public async Task SendVolunteerRequestAsync(string recipientEmail, string recipientName, string roleLabel, string roleDescription, string sundayDate, string acceptUrl, string rejectUrl, List<(string Time, string Label)>? timeSlots = null)
     {
+        // Build optional schedule section
+        var scheduleHtml = "";
+        if (timeSlots != null && timeSlots.Count > 0)
+        {
+            var rows = string.Join("", timeSlots.Select(ts => $"""
+                <tr>
+                  <td style="padding:7px 12px;font-weight:600;color:#005DBA;white-space:nowrap;border-bottom:1px solid #f3f4f6;">{System.Net.WebUtility.HtmlEncode(ts.Time)}</td>
+                  <td style="padding:7px 12px;color:#111827;border-bottom:1px solid #f3f4f6;">{System.Net.WebUtility.HtmlEncode(ts.Label)}</td>
+                </tr>
+                """));
+            scheduleHtml = $"""
+                <p style="margin:20px 0 8px;font-weight:700;color:#374151;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;">Schedule</p>
+                <table style="width:100%;border-collapse:collapse;font-size:0.9rem;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:24px;">
+                  {rows}
+                </table>
+                """;
+        }
+
         var html = $"""
             <div style="font-family:sans-serif;max-width:560px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
               <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
@@ -112,7 +130,7 @@ public class EmailService(IConfiguration config)
                 <div style="padding:24px 28px;">
                   <p style="margin:0 0 12px;color:#111827;">Hi <strong>{System.Net.WebUtility.HtmlEncode(recipientName)}</strong>,</p>
                   <p style="margin:0 0 16px;color:#374151;">You have been requested to serve in the following role:</p>
-                  <table style="width:100%;border-collapse:collapse;font-size:0.9rem;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:24px;">
+                  <table style="width:100%;border-collapse:collapse;font-size:0.9rem;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:8px;">
                     <tr>
                       <td style="padding:8px 12px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Role</td>
                       <td style="padding:8px 12px;color:#111827;border-bottom:1px solid #e5e7eb;">{System.Net.WebUtility.HtmlEncode(roleLabel)}</td>
@@ -122,10 +140,11 @@ public class EmailService(IConfiguration config)
                       <td style="padding:8px 12px;color:#111827;border-bottom:1px solid #e5e7eb;">{System.Net.WebUtility.HtmlEncode(roleDescription)}</td>
                     </tr>
                     <tr>
-                      <td style="padding:8px 12px;font-weight:600;color:#374151;">Sunday</td>
+                      <td style="padding:8px 12px;font-weight:600;color:#374151;">Date</td>
                       <td style="padding:8px 12px;color:#111827;">{System.Net.WebUtility.HtmlEncode(sundayDate)}</td>
                     </tr>
                   </table>
+                  {scheduleHtml}
                   <p style="margin:0 0 16px;color:#374151;">Please respond below:</p>
                   <div style="display:flex;gap:12px;">
                     <a href="{acceptUrl}" style="display:inline-block;padding:12px 24px;background:#059669;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Accept</a>

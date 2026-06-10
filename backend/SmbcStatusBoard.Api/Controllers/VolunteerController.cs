@@ -129,7 +129,7 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
     {
         if (!CanManageVolunteers()) return Forbid();
 
-        var role = await db.VolunteerRoles.FindAsync(req.RoleId);
+        var role = await db.VolunteerRoles.Include(r => r.TimeSlots).FirstOrDefaultAsync(r => r.Id == req.RoleId);
         if (role is null) return NotFound(new { message = "Role not found." });
 
         var user = await db.Users.FindAsync(req.UserId);
@@ -152,10 +152,14 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
             var frontendBase = config["App:NextFrontendUrl"] ?? "http://localhost:3000";
             var acceptUrl = $"{frontendBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=accept";
             var rejectUrl = $"{frontendBase}/api/public/volunteer-respond?token={assignment.ResponseToken}&response=reject";
+            var timeSlots = role.TimeSlots
+                .OrderBy(t => t.SortOrder)
+                .Select(t => (t.Time, t.Label))
+                .ToList();
             await emailService.SendVolunteerRequestAsync(
                 user.Email, user.Username, role.Label, role.Description,
                 assignment.SundayDate.ToString("MMMM d, yyyy"),
-                acceptUrl, rejectUrl);
+                acceptUrl, rejectUrl, timeSlots);
         }
         catch (Exception ex)
         {
