@@ -74,10 +74,9 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         db.InviteTokens.Add(invite);
         await db.SaveChangesAsync();
 
-        // Use SiteUrl (always the real WordPress URL) for invite links.
-        // FrontendUrl may be "*" in dev which is only used for CORS.
-        var siteUrl = config["App:SiteUrl"] ?? config["App:FrontendUrl"];
-        var inviteLink = $"{siteUrl}/smbc-setup-password/?token={token}";
+        // Use NextFrontendUrl so invite links go to the Next.js app, not WordPress.
+        var siteUrl = config["App:NextFrontendUrl"] ?? config["App:SiteUrl"] ?? config["App:FrontendUrl"];
+        var inviteLink = $"{siteUrl}/setup-password?token={token}";
 
         await emailService.SendInviteAsync(user.Email, user.Username, inviteLink);
 
