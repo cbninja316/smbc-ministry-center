@@ -13,7 +13,7 @@ namespace SmbcStatusBoard.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class ItemsController(AppDbContext db, FileStorageService storage) : ControllerBase
+public class ItemsController(AppDbContext db, FileStorageService storage, EmailService email) : ControllerBase
 {
     private string[] GetAllowedTypes() =>
         User.FindFirst("AllowedItemTypes")?.Value
@@ -146,16 +146,89 @@ public class ItemsController(AppDbContext db, FileStorageService storage) : Cont
     [HttpPatch("reorder")]
     public async Task<IActionResult> Reorder([FromBody] List<ItemReorderRequest> updates)
     {
+        var completedItems = new List<Item>();
+
         foreach (var update in updates)
         {
             var item = await db.Items.FindAsync(update.Id);
             if (item is null || !CanAccessType(item.Type)) continue;
+
+            // Track items that just flipped to Done so we can email after save
+            if (update.Status == ItemStatus.Done && item.Status != ItemStatus.Done
+                && !string.IsNullOrWhiteSpace(item.Email))
+            {
+                completedItems.Add(item);
+            }
+
             item.Status = update.Status;
             item.SortOrder = update.SortOrder;
         }
 
         await db.SaveChangesAsync();
+
+        // Send completion emails (fire-and-forget; don't let email errors fail the response)
+        foreach (var item in completedItems)
+        {
+            try { await SendCompletionEmailAsync(item); }
+            catch { /* best-effort */ }
+        }
+
         return Ok();
+    }
+
+    private static readonly Dictionary<ItemType, string> TypeLabels = new()
+    {
+        [ItemType.ChurchEvent]        = "Church Event",
+        [ItemType.FacilityUse]        = "Facility Use Request",
+        [ItemType.Benevolence]        = "Benevolence Request",
+        [ItemType.Maintenance]        = "Maintenance Request",
+        [ItemType.SecretaryRequest]   = "Secretary Request",
+    };
+
+    private async Task SendCompletionEmailAsync(Item item)
+    {
+        var typeLabel = TypeLabels.GetValueOrDefault(item.Type, item.Type.ToString());
+        var details = new List<(string Label, string Value)>();
+
+        // Fields common to all types
+        if (!string.IsNullOrWhiteSpace(item.Name))
+            details.Add(("Name / Title", item.Name));
+        if (!string.IsNullOrWhiteSpace(item.RequestedBy))
+            details.Add(("Submitted By", item.RequestedBy));
+        if (!string.IsNullOrWhiteSpace(item.Ministry))
+            details.Add(("Ministry", item.Ministry));
+        if (item.EventDate.HasValue)
+            details.Add(("Date", item.EventDate.Value.ToString("MMMM d, yyyy")));
+        if (!string.IsNullOrWhiteSpace(item.Description))
+            details.Add(("Description", item.Description));
+        details.Add(("Submitted On", item.SubmittedAt.ToString("MMMM d, yyyy")));
+
+        // Type-specific extras
+        if (item.Type == ItemType.ChurchEvent && item.ChurchEventDetails is { } ce)
+        {
+            if (!string.IsNullOrWhiteSpace(ce.StartTime))
+                details.Add(("Start Time", ce.StartTime));
+            if (!string.IsNullOrWhiteSpace(ce.EndTime))
+                details.Add(("End Time", ce.EndTime));
+            if (!string.IsNullOrWhiteSpace(ce.Location))
+                details.Add(("Location", ce.Location));
+        }
+
+        if (item.Type == ItemType.Benevolence && item.BenevolenceDetails is { } ben)
+        {
+            if (ben.AmountRequested.HasValue)
+                details.Add(("Amount Requested", $"${ben.AmountRequested:F2}"));
+            if (!string.IsNullOrWhiteSpace(ben.Determination))
+                details.Add(("Determination", ben.Determination switch
+                {
+                    "ApprovedFull" => "Approved in Full",
+                    "ApprovedPart" => "Approved in Part",
+                    "NotApproved"  => "Not Approved",
+                    _              => ben.Determination
+                }));
+        }
+
+        await email.SendItemCompletedAsync(item.Email!, item.RequestedBy, typeLabel, details);
     }
 
     private async Task AutoAdvanceStatusAsync()
