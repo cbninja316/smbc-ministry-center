@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SpecialEvent> SpecialEvents => Set<SpecialEvent>();
     public DbSet<BudgetCategory> BudgetCategories => Set<BudgetCategory>();
     public DbSet<BudgetEntry> BudgetEntries => Set<BudgetEntry>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +51,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<BudgetCategory>()
             .Property(c => c.AllocatedAmount)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BudgetCategory>()
+            .Property(c => c.YearlyAllocatedAmount)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BankAccount>()
+            .Property(a => a.Balance)
             .HasColumnType("TEXT");
 
         modelBuilder.Entity<BudgetEntry>()

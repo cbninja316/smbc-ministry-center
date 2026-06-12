@@ -25,6 +25,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
             TypeName = req.TypeName,
             Name = req.Name,
             AllocatedAmount = req.AllocatedAmount,
+            YearlyAllocatedAmount = req.YearlyAllocatedAmount,
             IsIncome = req.IsIncome,
             ColorHex = req.ColorHex ?? "#3B82F6",
             SortOrder = await db.BudgetCategories.CountAsync(),
@@ -42,6 +43,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
         cat.TypeName = req.TypeName;
         cat.Name = req.Name;
         cat.AllocatedAmount = req.AllocatedAmount;
+        cat.YearlyAllocatedAmount = req.YearlyAllocatedAmount;
         cat.IsIncome = req.IsIncome;
         cat.ColorHex = req.ColorHex ?? cat.ColorHex;
         await db.SaveChangesAsync();
@@ -254,6 +256,85 @@ public class BudgetController(AppDbContext db) : ControllerBase
         });
     }
 
+    // ── Yearly summary (for annual graph) ────────────────────────────────────
+
+    [HttpGet("yearly-summary")]
+    public async Task<IActionResult> GetYearlySummary([FromQuery] int year)
+    {
+        var yearStart = new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var yearEnd   = new DateTime(year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var categories = await db.BudgetCategories.ToListAsync();
+        var entries    = await db.BudgetEntries
+            .Where(e => e.Date >= yearStart && e.Date < yearEnd)
+            .ToListAsync();
+
+        var today      = DateTime.UtcNow;
+        var currentMonth = (today.Year == year) ? today.Month : (today.Year > year ? 12 : 0);
+
+        // Per-month actual spending (expenses) and income received
+        var monthlyExpense = new decimal[13]; // index 1-12
+        var monthlyIncome  = new decimal[13];
+        foreach (var entry in entries)
+        {
+            var m = entry.Date.Month;
+            var cat = categories.FirstOrDefault(c => c.Id == entry.BudgetCategoryId);
+            if (cat is null) continue;
+            if (cat.IsIncome) monthlyIncome[m]  += entry.Amount;
+            else              monthlyExpense[m]  += entry.Amount;
+        }
+
+        // Yearly allocation per category (explicit override or monthly * 12)
+        static decimal YearlyAlloc(BudgetCategory c) =>
+            c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
+
+        var totalYearlyExpense = categories.Where(c => !c.IsIncome).Sum(YearlyAlloc);
+        var totalYearlyIncome  = categories.Where(c => c.IsIncome).Sum(YearlyAlloc);
+
+        // Build monthly points for graph
+        var monthlyPoints = Enumerable.Range(1, 12).Select(m => new
+        {
+            month = m,
+            expenseActual  = monthlyExpense[m],
+            incomeActual   = monthlyIncome[m],
+            expenseProjected = totalYearlyExpense / 12,   // even monthly pace
+            incomeProjected  = totalYearlyIncome  / 12,
+        }).ToList();
+
+        // Cumulative actual (for cumulative line graph)
+        var cumExpense = 0m;
+        var cumulativePoints = monthlyPoints.Select(p =>
+        {
+            cumExpense += p.expenseActual;
+            return new { p.month, cumulativeExpense = cumExpense, projectedCumulative = p.expenseProjected * p.month };
+        }).ToList();
+
+        // Per-category yearly breakdown
+        var categoryBreakdown = categories.Select(c =>
+        {
+            var spent = entries.Where(e => e.BudgetCategoryId == c.Id).Sum(e => e.Amount);
+            return new
+            {
+                c.Id, c.TypeName, c.Name, c.ColorHex, c.IsIncome,
+                YearlyAllocated = YearlyAlloc(c),
+                Spent = spent,
+            };
+        }).ToList();
+
+        return Ok(new
+        {
+            year,
+            currentMonth,
+            totalYearlyExpense,
+            totalYearlyIncome,
+            totalSpentExpenseYtd = monthlyExpense.Sum(),
+            totalSpentIncomeYtd  = monthlyIncome.Sum(),
+            monthlyPoints,
+            cumulativePoints,
+            categoryBreakdown,
+        });
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static object MapEntry(BudgetEntry e) => new
@@ -276,6 +357,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
         string TypeName,
         string Name,
         decimal AllocatedAmount,
+        decimal YearlyAllocatedAmount,
         bool IsIncome,
         string? ColorHex
     );

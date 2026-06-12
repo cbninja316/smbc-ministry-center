@@ -13,6 +13,12 @@ public class BudgetCategory
     /// <summary>Monthly allocation amount</summary>
     public decimal AllocatedAmount { get; set; }
 
+    /// <summary>
+    /// Optional annual override. If 0, the yearly budget is computed as AllocatedAmount * 12.
+    /// Use this for categories with non-uniform annual spend (e.g. annual insurance).
+    /// </summary>
+    public decimal YearlyAllocatedAmount { get; set; } = 0;
+
     /// <summary>Whether this is an income category (vs expense)</summary>
     public bool IsIncome { get; set; } = false;
 
