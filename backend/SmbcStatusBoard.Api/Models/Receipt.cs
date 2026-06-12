@@ -11,4 +11,7 @@ public class Receipt
     public string OneDriveFileId { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsDone { get; set; } = false;
+
+    /// <summary>User dismissed the "assign to budget" notification for this receipt</summary>
+    public bool BudgetDismissed { get; set; } = false;
 }

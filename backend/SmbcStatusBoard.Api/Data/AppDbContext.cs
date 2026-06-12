@@ -15,6 +15,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<VolunteerAssignment> VolunteerAssignments => Set<VolunteerAssignment>();
     public DbSet<RoleTimeSlot> RoleTimeSlots => Set<RoleTimeSlot>();
     public DbSet<SpecialEvent> SpecialEvents => Set<SpecialEvent>();
+    public DbSet<BudgetCategory> BudgetCategories => Set<BudgetCategory>();
+    public DbSet<BudgetEntry> BudgetEntries => Set<BudgetEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +47,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Receipt>()
             .Property(r => r.Amount)
             .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BudgetCategory>()
+            .Property(c => c.AllocatedAmount)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BudgetEntry>()
+            .Property(e => e.Amount)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BudgetEntry>()
+            .HasOne(e => e.Category)
+            .WithMany(c => c.Entries)
+            .HasForeignKey(e => e.BudgetCategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<BudgetEntry>()
+            .HasOne(e => e.Receipt)
+            .WithMany()
+            .HasForeignKey(e => e.ReceiptId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<VolunteerAssignment>()
             .HasOne(a => a.Role)
