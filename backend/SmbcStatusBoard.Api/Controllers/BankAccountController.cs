@@ -7,7 +7,7 @@ using SmbcStatusBoard.Api.Models;
 namespace SmbcStatusBoard.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/bank-account")]
 [Authorize]
 public class BankAccountController(AppDbContext db) : ControllerBase
 {
