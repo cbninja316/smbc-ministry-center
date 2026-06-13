@@ -335,6 +335,66 @@ public class BudgetController(AppDbContext db) : ControllerBase
         });
     }
 
+    // ── Monthly breakdown (per-category spending by month for a whole year) ──
+
+    [HttpGet("monthly-breakdown")]
+    public async Task<IActionResult> GetMonthlyBreakdown([FromQuery] int year)
+    {
+        var yearStart = new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var yearEnd   = new DateTime(year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var categories = await db.BudgetCategories
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.TypeName).ThenBy(c => c.Name)
+            .ToListAsync();
+        var entries = await db.BudgetEntries
+            .Where(e => e.Date >= yearStart && e.Date < yearEnd)
+            .ToListAsync();
+
+        static decimal YearlyAlloc(BudgetCategory c) =>
+            c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
+
+        var categoryData = categories.Select(c =>
+        {
+            var monthlySpent = new decimal[13]; // 1-indexed; index 0 unused
+            foreach (var e in entries.Where(e => e.BudgetCategoryId == c.Id))
+                monthlySpent[e.Date.Month] += e.Amount;
+
+            return new
+            {
+                c.Id,
+                c.TypeName,
+                c.Name,
+                c.AllocatedAmount,
+                YearlyAllocatedAmount = YearlyAlloc(c),
+                c.IsIncome,
+                c.ColorHex,
+                // 12 elements, index 0 = Jan, index 11 = Dec
+                MonthlySpent = Enumerable.Range(1, 12).Select(m => monthlySpent[m]).ToArray(),
+                YtdSpent = monthlySpent.Skip(1).Sum(),
+            };
+        }).ToList();
+
+        // Monthly income/expense totals across all categories
+        var monthlyIncomeTotals  = Enumerable.Range(1, 12).Select(m =>
+            entries.Where(e => categories.Any(c => c.Id == e.BudgetCategoryId && c.IsIncome) &&
+                               e.Date.Month == m).Sum(e => e.Amount)).ToArray();
+        var monthlyExpenseTotals = Enumerable.Range(1, 12).Select(m =>
+            entries.Where(e => categories.Any(c => c.Id == e.BudgetCategoryId && !c.IsIncome) &&
+                               e.Date.Month == m).Sum(e => e.Amount)).ToArray();
+
+        return Ok(new
+        {
+            year,
+            categories = categoryData,
+            monthlyIncomeTotals,
+            monthlyExpenseTotals,
+            ytdIncome  = monthlyIncomeTotals.Sum(),
+            ytdExpense = monthlyExpenseTotals.Sum(),
+            totalYearlyIncome   = categories.Where(c => c.IsIncome).Sum(YearlyAlloc),
+            totalYearlyExpense  = categories.Where(c => !c.IsIncome).Sum(YearlyAlloc),
+        });
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static object MapEntry(BudgetEntry e) => new
