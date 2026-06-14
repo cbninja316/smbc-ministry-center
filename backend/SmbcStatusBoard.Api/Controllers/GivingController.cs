@@ -82,6 +82,114 @@ public class GivingController(AppDbContext db) : ControllerBase
         });
     }
 
+    // GET /api/giving/my-salary — returns the current user's salary budget category + this month's remaining
+    [HttpGet("my-salary")]
+    public async Task<IActionResult> GetMySalary()
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var cat = await db.BudgetCategories
+            .FirstOrDefaultAsync(c => c.IsSalary && c.SalaryUserId == userId);
+
+        if (cat is null) return NotFound();
+
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEnd = monthStart.AddMonths(1);
+
+        var spent = await db.BudgetEntries
+            .Where(e => e.BudgetCategoryId == cat.Id && e.Date >= monthStart && e.Date < monthEnd)
+            .SumAsync(e => (decimal?)e.Amount) ?? 0m;
+
+        var monthly = cat.AllocatedAmount;
+        var remaining = Math.Max(0, monthly - spent);
+
+        return Ok(new
+        {
+            cat.Id,
+            cat.Name,
+            MonthlyAmount = monthly,
+            CurrentMonthSpent = spent,
+            Remaining = remaining
+        });
+    }
+
+    // POST /api/giving/donate-check — log salary donation: creates giving entry + salary budget entry
+    [HttpPost("donate-check")]
+    public async Task<IActionResult> DonateCheck([FromBody] DonateCheckRequest req)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        if (req.Amount <= 0)
+            return BadRequest(new { message = "Amount must be greater than zero." });
+
+        // Verify the user has a salary category
+        var salaryCat = await db.BudgetCategories
+            .FirstOrDefaultAsync(c => c.IsSalary && c.SalaryUserId == userId);
+        if (salaryCat is null)
+            return BadRequest(new { message = "No salary category found for your account." });
+
+        // Verify the giving (income) category
+        BudgetCategory? givingCat = null;
+        if (req.GivingCategoryId.HasValue)
+        {
+            givingCat = await db.BudgetCategories.FindAsync(req.GivingCategoryId.Value);
+            if (givingCat is null || !givingCat.IsIncome)
+                return BadRequest(new { message = "Invalid giving category." });
+        }
+
+        var date = req.Date ?? DateTime.UtcNow;
+        var user = await db.Users.FindAsync(userId);
+
+        // Giving entry (shows in member's giving history / tax record)
+        var givingEntry = new GivingEntry
+        {
+            UserId = userId,
+            BudgetCategoryId = givingCat?.Id,
+            CategoryName = givingCat?.Name ?? "General",
+            Amount = req.Amount,
+            Date = date,
+            Notes = req.Notes ?? $"Salary donation — {salaryCat.Name}"
+        };
+        db.GivingEntries.Add(givingEntry);
+
+        // Mirror giving into income budget tracking
+        if (givingCat is not null)
+        {
+            db.BudgetEntries.Add(new BudgetEntry
+            {
+                BudgetCategoryId = givingCat.Id,
+                Amount = req.Amount,
+                Date = date,
+                Description = $"Salary donation — {user?.Username ?? "member"}",
+                Notes = req.Notes
+            });
+        }
+
+        // Budget entry on the salary expense line (zeroes it out)
+        db.BudgetEntries.Add(new BudgetEntry
+        {
+            BudgetCategoryId = salaryCat.Id,
+            Amount = req.Amount,
+            Date = date,
+            Description = $"Check donated — {user?.Username ?? "member"}",
+            Notes = req.Notes
+        });
+
+        await db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            givingEntry.Id,
+            givingEntry.CategoryName,
+            givingEntry.Amount,
+            Date = givingEntry.Date.ToString("yyyy-MM-dd"),
+            givingEntry.Notes
+        });
+    }
+
     // GET /api/giving/my — authenticated user's giving history
     [HttpGet("my")]
     public async Task<IActionResult> GetMyGiving()
@@ -108,3 +216,4 @@ public class GivingController(AppDbContext db) : ControllerBase
 }
 
 public record GiveRequest(decimal Amount, int? BudgetCategoryId, string? CategoryName, DateTime? Date, string? Notes);
+public record DonateCheckRequest(decimal Amount, int? GivingCategoryId, DateTime? Date, string? Notes);
