@@ -122,11 +122,12 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         if (await db.Users.AnyAsync(u => u.Email == req.Email))
             return Conflict(new { message = "An account with that email already exists." });
 
-        // Generate unique username: firstnamelastname (lowercase, letters only)
-        var baseUsername = (req.FirstName.Trim() + req.LastName.Trim())
-            .ToLower()
-            .Where(char.IsLetter)
-            .Aggregate("", (s, c) => s + c);
+        // Generate unique username: FirstLast (first letter uppercase, rest lowercase, letters only)
+        static string Capitalize(string s) {
+            var letters = new string(s.Where(char.IsLetter).ToArray());
+            return letters.Length == 0 ? "" : char.ToUpper(letters[0]) + letters[1..].ToLower();
+        }
+        var baseUsername = Capitalize(req.FirstName.Trim()) + Capitalize(req.LastName.Trim());
 
         var username = baseUsername;
         var suffix = 1;
