@@ -141,7 +141,7 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
             Email = req.Email.Trim().ToLower(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
             Role = UserRole.Member,
-            IsActive = true,
+            IsActive = false,
             EmailVerified = false,
             AllowedItemTypes = string.Empty
         };
@@ -161,7 +161,16 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
 
         var frontendUrl = config["App:NextFrontendUrl"] ?? "https://oneaccord.southmoorebc.org";
         var verifyLink = $"{frontendUrl}/verify-email?token={tokenStr}";
-        await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink);
+        try
+        {
+            await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink);
+        }
+        catch (Exception ex)
+        {
+            // Log the error so it's visible in server output
+            Console.Error.WriteLine($"[Register] Failed to send verification email to {user.Email}: {ex.Message}");
+            return StatusCode(500, new { message = $"Account created but verification email could not be sent: {ex.Message}. Please contact an admin." });
+        }
 
         return Ok(new { message = "Account created. Please check your email to verify your account.", username });
     }
@@ -177,6 +186,7 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
             return BadRequest(new { message = "Invalid or expired verification link." });
 
         verifyToken.User.EmailVerified = true;
+        verifyToken.User.IsActive = true;
         verifyToken.Used = true;
         await db.SaveChangesAsync();
 
