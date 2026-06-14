@@ -54,6 +54,22 @@ public class GivingController(AppDbContext db) : ControllerBase
         };
 
         db.GivingEntries.Add(entry);
+
+        // Mirror into BudgetEntries so it shows in the budget income tracking
+        if (cat is not null)
+        {
+            var user = await db.Users.FindAsync(userId);
+            var budgetEntry = new BudgetEntry
+            {
+                BudgetCategoryId = cat.Id,
+                Amount = req.Amount,
+                Date = entry.Date,
+                Description = $"Online giving — {user?.Username ?? "member"}",
+                Notes = req.Notes
+            };
+            db.BudgetEntries.Add(budgetEntry);
+        }
+
         await db.SaveChangesAsync();
 
         return Ok(new
