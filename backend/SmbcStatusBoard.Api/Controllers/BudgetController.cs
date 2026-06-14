@@ -130,6 +130,42 @@ public class BudgetController(AppDbContext db) : ControllerBase
         db.BudgetEntries.Add(entry);
         await db.SaveChangesAsync();
         await db.Entry(entry).Reference(e => e.Category).LoadAsync();
+
+        // Auto-donate: if this entry is for a salary category and the linked user has auto-donate on
+        if (entry.Category.IsSalary && entry.Category.SalaryUserId.HasValue)
+        {
+            var salaryUser = await db.Users
+                .Include(u => u.SalaryDonateGivingCategory)
+                .FirstOrDefaultAsync(u => u.Id == entry.Category.SalaryUserId.Value);
+
+            if (salaryUser is { SalaryDonateEnabled: true, SalaryDonatePercentage: > 0 }
+                && salaryUser.SalaryDonateGivingCategoryId.HasValue)
+            {
+                var givingCat = salaryUser.SalaryDonateGivingCategory;
+                var donateAmount = Math.Round(entry.Amount * salaryUser.SalaryDonatePercentage / 100m, 2);
+                if (donateAmount > 0 && givingCat is not null)
+                {
+                    db.GivingEntries.Add(new GivingEntry
+                    {
+                        UserId = salaryUser.Id,
+                        BudgetCategoryId = givingCat.Id,
+                        CategoryName = givingCat.Name,
+                        Amount = donateAmount,
+                        Date = entry.Date,
+                        Notes = $"Auto-donation {salaryUser.SalaryDonatePercentage}% of salary"
+                    });
+                    db.BudgetEntries.Add(new BudgetEntry
+                    {
+                        BudgetCategoryId = givingCat.Id,
+                        Amount = donateAmount,
+                        Date = entry.Date,
+                        Description = $"Salary donation — {salaryUser.Username}",
+                    });
+                    await db.SaveChangesAsync();
+                }
+            }
+        }
+
         return Ok(MapEntry(entry));
     }
 

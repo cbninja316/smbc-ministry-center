@@ -18,6 +18,11 @@ public class User
 
     public DateOnly? BirthDate { get; set; }
 
+    public bool SalaryDonateEnabled { get; set; } = false;
+    public decimal SalaryDonatePercentage { get; set; } = 0;
+    public int? SalaryDonateGivingCategoryId { get; set; }
+    public BudgetCategory? SalaryDonateGivingCategory { get; set; }
+
     public string? PreferencesJson { get; set; }
 
     public ICollection<InviteToken> InviteTokens { get; set; } = new List<InviteToken>();

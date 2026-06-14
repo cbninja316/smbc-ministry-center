@@ -82,6 +82,45 @@ public class GivingController(AppDbContext db) : ControllerBase
         });
     }
 
+    // GET /api/giving/salary-donate-settings
+    [HttpGet("salary-donate-settings")]
+    public async Task<IActionResult> GetSalaryDonateSettings()
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is null) return NotFound();
+
+        return Ok(new
+        {
+            user.SalaryDonateEnabled,
+            user.SalaryDonatePercentage,
+            user.SalaryDonateGivingCategoryId
+        });
+    }
+
+    // PUT /api/giving/salary-donate-settings
+    [HttpPut("salary-donate-settings")]
+    public async Task<IActionResult> UpdateSalaryDonateSettings([FromBody] SalaryDonateSettingsRequest req)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        if (req.Percentage < 0 || req.Percentage > 100)
+            return BadRequest(new { message = "Percentage must be between 0 and 100." });
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is null) return NotFound();
+
+        user.SalaryDonateEnabled = req.Enabled;
+        user.SalaryDonatePercentage = req.Percentage;
+        user.SalaryDonateGivingCategoryId = req.GivingCategoryId;
+        await db.SaveChangesAsync();
+
+        return Ok(new { message = "Settings saved." });
+    }
+
     // GET /api/giving/my-salary — returns the current user's salary budget category + this month's remaining
     [HttpGet("my-salary")]
     public async Task<IActionResult> GetMySalary()
@@ -207,3 +246,4 @@ public class GivingController(AppDbContext db) : ControllerBase
 
 public record GiveRequest(decimal Amount, int? BudgetCategoryId, string? CategoryName, DateTime? Date, string? Notes);
 public record DonateCheckRequest(decimal Amount, int? GivingCategoryId, DateTime? Date, string? Notes);
+public record SalaryDonateSettingsRequest(bool Enabled, decimal Percentage, int? GivingCategoryId);
