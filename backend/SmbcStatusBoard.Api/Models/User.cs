@@ -16,6 +16,8 @@ public class User
     public string AllowedItemTypes { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public DateOnly? BirthDate { get; set; }
+
     public string? PreferencesJson { get; set; }
 
     public ICollection<InviteToken> InviteTokens { get; set; } = new List<InviteToken>();

@@ -133,6 +133,10 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         while (await db.Users.AnyAsync(u => u.Username == username))
             username = baseUsername + suffix++;
 
+        DateOnly? birthDate = null;
+        if (!string.IsNullOrWhiteSpace(req.BirthDate) && DateOnly.TryParse(req.BirthDate, out var parsedBirth))
+            birthDate = parsedBirth;
+
         var user = new User
         {
             FirstName = req.FirstName.Trim(),
@@ -143,7 +147,8 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
             Role = UserRole.Member,
             IsActive = false,
             EmailVerified = false,
-            AllowedItemTypes = string.Empty
+            AllowedItemTypes = string.Empty,
+            BirthDate = birthDate
         };
 
         db.Users.Add(user);
@@ -193,6 +198,28 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         var jwtToken = tokenService.Generate(verifyToken.User);
         var allowed = verifyToken.User.AllowedItemTypes.Split(',', StringSplitOptions.RemoveEmptyEntries);
         return Ok(new LoginResponse(jwtToken, verifyToken.User.Username, verifyToken.User.Role.ToString(), allowed));
+    }
+
+    [HttpPatch("birthdate")]
+    [Authorize]
+    public async Task<IActionResult> UpdateBirthDate([FromBody] UpdateBirthDateRequest req)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(req.BirthDate))
+            user.BirthDate = null;
+        else if (DateOnly.TryParse(req.BirthDate, out var parsed))
+            user.BirthDate = parsed;
+        else
+            return BadRequest(new { message = "Invalid date format." });
+
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Birthdate updated." });
     }
 
     [HttpPost("change-password")]

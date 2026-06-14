@@ -42,19 +42,32 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
     [HttpPost("invite")]
     public async Task<IActionResult> Invite([FromBody] InviteUserRequest req)
     {
+        if (string.IsNullOrWhiteSpace(req.FirstName) || string.IsNullOrWhiteSpace(req.LastName))
+            return BadRequest(new { message = "First and last name are required." });
+
         if (await db.Users.AnyAsync(u => u.Email == req.Email))
             return Conflict(new { message = "A user with that email already exists." });
-
-        if (await db.Users.AnyAsync(u => u.Username == req.Username))
-            return Conflict(new { message = "That username is already taken." });
 
         if (!Enum.TryParse<UserRole>(req.Role, true, out var role))
             return BadRequest(new { message = "Invalid role." });
 
+        // Generate username: FirstLast with first letter of each capitalised, letters only
+        static string Capitalize(string s) {
+            var letters = new string(s.Where(char.IsLetter).ToArray());
+            return letters.Length == 0 ? "" : char.ToUpper(letters[0]) + letters[1..].ToLower();
+        }
+        var baseUsername = Capitalize(req.FirstName.Trim()) + Capitalize(req.LastName.Trim());
+        var username = baseUsername;
+        var suffix = 1;
+        while (await db.Users.AnyAsync(u => u.Username == username))
+            username = baseUsername + suffix++;
+
         var user = new User
         {
-            Username = req.Username,
-            Email = req.Email,
+            FirstName = req.FirstName.Trim(),
+            LastName = req.LastName.Trim(),
+            Username = username,
+            Email = req.Email.Trim().ToLower(),
             Role = role,
             AllowedItemTypes = string.Join(',', req.AllowedItemTypes),
             IsActive = false
