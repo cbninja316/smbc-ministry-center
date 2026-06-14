@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,13 +14,35 @@ public class BudgetController(AppDbContext db) : ControllerBase
 {
     // ── Categories ────────────────────────────────────────────────────────────
 
+    bool IsSuperAdmin() => User.FindFirstValue("role") == "SuperAdmin" ||
+        User.IsInRole("SuperAdmin") ||
+        (User.FindFirstValue(ClaimTypes.Role) == "SuperAdmin");
+
     [HttpGet("categories")]
-    public async Task<IActionResult> GetCategories() =>
-        Ok(await db.BudgetCategories.OrderBy(c => c.SortOrder).ThenBy(c => c.TypeName).ThenBy(c => c.Name).ToListAsync());
+    public async Task<IActionResult> GetCategories()
+    {
+        var superAdmin = IsSuperAdmin();
+        var cats = await db.BudgetCategories
+            .Include(c => c.SalaryUser)
+            .OrderBy(c => c.SortOrder).ThenBy(c => c.TypeName).ThenBy(c => c.Name)
+            .ToListAsync();
+
+        return Ok(cats.Select(c => new
+        {
+            c.Id, c.TypeName, c.Name, c.IsIncome, c.ColorHex, c.SortOrder, c.IsSalary,
+            // Non-super-admins see zero amounts for salary categories
+            allocatedAmount       = (c.IsSalary && !superAdmin) ? 0m : c.AllocatedAmount,
+            yearlyAllocatedAmount = (c.IsSalary && !superAdmin) ? 0m : c.YearlyAllocatedAmount,
+            // Only super admins see the linked user
+            salaryUserId   = superAdmin ? c.SalaryUserId   : (int?)null,
+            salaryUserName = superAdmin ? (c.SalaryUser != null ? $"{c.SalaryUser.FirstName} {c.SalaryUser.LastName}".Trim() : null) : null,
+        }));
+    }
 
     [HttpPost("categories")]
     public async Task<IActionResult> CreateCategory([FromBody] CategoryRequest req)
     {
+        if (!IsSuperAdmin()) return Forbid();
         var cat = new BudgetCategory
         {
             TypeName = req.TypeName,
@@ -29,6 +52,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
             IsIncome = req.IsIncome,
             ColorHex = req.ColorHex ?? "#3B82F6",
             SortOrder = await db.BudgetCategories.CountAsync(),
+            IsSalary = req.IsSalary,
+            SalaryUserId = req.IsSalary ? req.SalaryUserId : null,
         };
         db.BudgetCategories.Add(cat);
         await db.SaveChangesAsync();
@@ -38,6 +63,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
     [HttpPut("categories/{id}")]
     public async Task<IActionResult> UpdateCategory(int id, [FromBody] CategoryRequest req)
     {
+        if (!IsSuperAdmin()) return Forbid();
         var cat = await db.BudgetCategories.FindAsync(id);
         if (cat is null) return NotFound();
         cat.TypeName = req.TypeName;
@@ -46,6 +72,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
         cat.YearlyAllocatedAmount = req.YearlyAllocatedAmount;
         cat.IsIncome = req.IsIncome;
         cat.ColorHex = req.ColorHex ?? cat.ColorHex;
+        cat.IsSalary = req.IsSalary;
+        cat.SalaryUserId = req.IsSalary ? req.SalaryUserId : null;
         await db.SaveChangesAsync();
         return Ok(cat);
     }
@@ -226,17 +254,20 @@ public class BudgetController(AppDbContext db) : ControllerBase
             .ToList();
 
         // Per-category breakdown
+        var isSuperAdminSummary = IsSuperAdmin();
         var categoryBreakdown = categories.Select(c =>
         {
             var spent = entries.Where(e => e.BudgetCategoryId == c.Id).Sum(e => e.Amount);
+            var redact = c.IsSalary && !isSuperAdminSummary;
             return new
             {
                 c.Id,
                 c.TypeName,
                 c.Name,
-                c.AllocatedAmount,
                 c.IsIncome,
                 c.ColorHex,
+                c.IsSalary,
+                AllocatedAmount = redact ? 0m : c.AllocatedAmount,
                 Spent = spent,
             };
         }).ToList();
@@ -353,21 +384,24 @@ public class BudgetController(AppDbContext db) : ControllerBase
         static decimal YearlyAlloc(BudgetCategory c) =>
             c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
 
+        var superAdmin = IsSuperAdmin();
         var categoryData = categories.Select(c =>
         {
             var monthlySpent = new decimal[13]; // 1-indexed; index 0 unused
             foreach (var e in entries.Where(e => e.BudgetCategoryId == c.Id))
                 monthlySpent[e.Date.Month] += e.Amount;
 
+            var redact = c.IsSalary && !superAdmin;
             return new
             {
                 c.Id,
                 c.TypeName,
                 c.Name,
-                c.AllocatedAmount,
-                YearlyAllocatedAmount = YearlyAlloc(c),
                 c.IsIncome,
                 c.ColorHex,
+                c.IsSalary,
+                AllocatedAmount       = redact ? 0m : c.AllocatedAmount,
+                YearlyAllocatedAmount = redact ? 0m : YearlyAlloc(c),
                 // 12 elements, index 0 = Jan, index 11 = Dec
                 MonthlySpent = Enumerable.Range(1, 12).Select(m => monthlySpent[m]).ToArray(),
                 YtdSpent = monthlySpent.Skip(1).Sum(),
@@ -390,8 +424,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
             monthlyExpenseTotals,
             ytdIncome  = monthlyIncomeTotals.Sum(),
             ytdExpense = monthlyExpenseTotals.Sum(),
-            totalYearlyIncome   = categories.Where(c => c.IsIncome).Sum(YearlyAlloc),
-            totalYearlyExpense  = categories.Where(c => !c.IsIncome).Sum(YearlyAlloc),
+            totalYearlyIncome  = categories.Where(c => c.IsIncome).Sum(c => (!superAdmin && c.IsSalary) ? 0m : YearlyAlloc(c)),
+            totalYearlyExpense = categories.Where(c => !c.IsIncome).Sum(c => (!superAdmin && c.IsSalary) ? 0m : YearlyAlloc(c)),
         });
     }
 
@@ -419,7 +453,9 @@ public class BudgetController(AppDbContext db) : ControllerBase
         decimal AllocatedAmount,
         decimal YearlyAllocatedAmount,
         bool IsIncome,
-        string? ColorHex
+        string? ColorHex,
+        bool IsSalary = false,
+        int? SalaryUserId = null
     );
 
     public record EntryRequest(

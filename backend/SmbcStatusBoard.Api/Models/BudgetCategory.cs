@@ -27,5 +27,12 @@ public class BudgetCategory
 
     public int SortOrder { get; set; } = 0;
 
+    /// <summary>If true, this category represents a staff salary line.</summary>
+    public bool IsSalary { get; set; } = false;
+
+    /// <summary>Optional user tied to this salary line. Only visible to SuperAdmin.</summary>
+    public int? SalaryUserId { get; set; }
+    public User? SalaryUser { get; set; }
+
     public ICollection<BudgetEntry> Entries { get; set; } = new List<BudgetEntry>();
 }

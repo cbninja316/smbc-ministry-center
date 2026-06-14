@@ -59,6 +59,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .Property(c => c.YearlyAllocatedAmount)
             .HasColumnType("TEXT");
 
+        modelBuilder.Entity<BudgetCategory>()
+            .HasOne(c => c.SalaryUser)
+            .WithMany()
+            .HasForeignKey(c => c.SalaryUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<BankAccount>()
             .Property(a => a.Balance)
             .HasColumnType("TEXT");
