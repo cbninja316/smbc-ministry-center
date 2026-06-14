@@ -155,7 +155,7 @@ public class GivingController(AppDbContext db) : ControllerBase
         };
         db.GivingEntries.Add(givingEntry);
 
-        // Mirror giving into income budget tracking
+        // Mirror into income budget tracking so the donation shows as church income
         if (givingCat is not null)
         {
             db.BudgetEntries.Add(new BudgetEntry
@@ -167,16 +167,6 @@ public class GivingController(AppDbContext db) : ControllerBase
                 Notes = req.Notes
             });
         }
-
-        // Budget entry on the salary expense line (zeroes it out)
-        db.BudgetEntries.Add(new BudgetEntry
-        {
-            BudgetCategoryId = salaryCat.Id,
-            Amount = req.Amount,
-            Date = date,
-            Description = $"Check donated — {user?.Username ?? "member"}",
-            Notes = req.Notes
-        });
 
         await db.SaveChangesAsync();
 
