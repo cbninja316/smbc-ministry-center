@@ -104,6 +104,87 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         return Ok(new LoginResponse(jwtToken, resetToken.User.Username, resetToken.User.Role.ToString(), allowed));
     }
 
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.FirstName) || string.IsNullOrWhiteSpace(req.LastName))
+            return BadRequest(new { message = "First and last name are required." });
+
+        if (string.IsNullOrWhiteSpace(req.Email) || !req.Email.Contains('@'))
+            return BadRequest(new { message = "A valid email address is required." });
+
+        if (req.Password.Length < 8)
+            return BadRequest(new { message = "Password must be at least 8 characters." });
+
+        if (req.Password != req.ConfirmPassword)
+            return BadRequest(new { message = "Passwords do not match." });
+
+        if (await db.Users.AnyAsync(u => u.Email == req.Email))
+            return Conflict(new { message = "An account with that email already exists." });
+
+        // Generate unique username: firstnamelastname (lowercase, letters only)
+        var baseUsername = (req.FirstName.Trim() + req.LastName.Trim())
+            .ToLower()
+            .Where(char.IsLetter)
+            .Aggregate("", (s, c) => s + c);
+
+        var username = baseUsername;
+        var suffix = 1;
+        while (await db.Users.AnyAsync(u => u.Username == username))
+            username = baseUsername + suffix++;
+
+        var user = new User
+        {
+            FirstName = req.FirstName.Trim(),
+            LastName = req.LastName.Trim(),
+            Username = username,
+            Email = req.Email.Trim().ToLower(),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
+            Role = UserRole.Member,
+            IsActive = true,
+            EmailVerified = false,
+            AllowedItemTypes = string.Empty
+        };
+
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var tokenStr = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+        var verifyToken = new EmailVerificationToken
+        {
+            Token = tokenStr,
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddHours(24)
+        };
+        db.EmailVerificationTokens.Add(verifyToken);
+        await db.SaveChangesAsync();
+
+        var frontendUrl = config["App:NextFrontendUrl"] ?? "https://oneaccord.southmoorebc.org";
+        var verifyLink = $"{frontendUrl}/verify-email?token={tokenStr}";
+        await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink);
+
+        return Ok(new { message = "Account created. Please check your email to verify your account.", username });
+    }
+
+    [HttpGet("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+    {
+        var verifyToken = await db.EmailVerificationTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Token == token && !t.Used && t.ExpiresAt > DateTime.UtcNow);
+
+        if (verifyToken is null)
+            return BadRequest(new { message = "Invalid or expired verification link." });
+
+        verifyToken.User.EmailVerified = true;
+        verifyToken.Used = true;
+        await db.SaveChangesAsync();
+
+        var jwtToken = tokenService.Generate(verifyToken.User);
+        var allowed = verifyToken.User.AllowedItemTypes.Split(',', StringSplitOptions.RemoveEmptyEntries);
+        return Ok(new LoginResponse(jwtToken, verifyToken.User.Username, verifyToken.User.Role.ToString(), allowed));
+    }
+
     [HttpPost("change-password")]
     [Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest req)

@@ -354,4 +354,85 @@ public class EmailService(IConfiguration config)
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
+
+    public async Task SendEmailVerificationAsync(string toEmail, string toName, string verifyLink)
+    {
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.Subject = "Verify your One Accord account";
+
+        message.Body = new TextPart("html")
+        {
+            Text = $"""
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
+                  <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+                    <div style="background:#005DBA;padding:20px 28px;">
+                      <h2 style="margin:0;color:#fff;font-size:1.2rem;">Welcome to One Accord!</h2>
+                    </div>
+                    <div style="padding:24px 28px;">
+                      <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
+                      <p style="margin:0 0 20px;color:#374151;">Thanks for creating an account. Click the button below to verify your email and activate your account.</p>
+                      <a href="{verifyLink}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">Verify My Email</a>
+                      <p style="margin:20px 0 0;color:#9ca3af;font-size:0.8rem;">This link expires in 24 hours. If you did not create an account, you can ignore this email.</p>
+                    </div>
+                  </div>
+                </div>
+                """
+        };
+
+        using var client = new SmtpClient();
+        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
+        {
+            if (errors == SslPolicyErrors.None) return true;
+            if (chain == null) return false;
+            return chain.ChainStatus.All(s =>
+                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
+                s.Status == X509ChainStatusFlags.OfflineRevocation);
+        };
+        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
+        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+        await client.SendAsync(message);
+        await client.DisconnectAsync(true);
+    }
+
+    public async Task SendRolePromotionAsync(string toEmail, string toName, string newRole, string loginUrl)
+    {
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.Subject = "Your One Accord role has been updated";
+
+        message.Body = new TextPart("html")
+        {
+            Text = $"""
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
+                  <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+                    <div style="background:#005DBA;padding:20px 28px;">
+                      <h2 style="margin:0;color:#fff;font-size:1.2rem;">Role Updated</h2>
+                    </div>
+                    <div style="padding:24px 28px;">
+                      <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
+                      <p style="margin:0 0 20px;color:#374151;">Your account has been updated to <strong>{System.Net.WebUtility.HtmlEncode(newRole)}</strong>. You now have additional access in One Accord.</p>
+                      <a href="{loginUrl}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">Log In</a>
+                    </div>
+                  </div>
+                </div>
+                """
+        };
+
+        using var client = new SmtpClient();
+        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
+        {
+            if (errors == SslPolicyErrors.None) return true;
+            if (chain == null) return false;
+            return chain.ChainStatus.All(s =>
+                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
+                s.Status == X509ChainStatusFlags.OfflineRevocation);
+        };
+        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
+        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+        await client.SendAsync(message);
+        await client.DisconnectAsync(true);
+    }
 }

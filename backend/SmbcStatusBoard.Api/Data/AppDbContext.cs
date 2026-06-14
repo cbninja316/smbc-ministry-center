@@ -18,6 +18,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<BudgetCategory> BudgetCategories => Set<BudgetCategory>();
     public DbSet<BudgetEntry> BudgetEntries => Set<BudgetEntry>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<GivingEntry> GivingEntries => Set<GivingEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -102,5 +104,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany(r => r.TimeSlots)
             .HasForeignKey(t => t.RoleId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasOne(t => t.User)
+            .WithMany(u => u.EmailVerificationTokens)
+            .HasForeignKey(t => t.UserId);
+
+        modelBuilder.Entity<GivingEntry>()
+            .HasOne(g => g.User)
+            .WithMany(u => u.GivingEntries)
+            .HasForeignKey(g => g.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<GivingEntry>()
+            .HasOne(g => g.BudgetCategory)
+            .WithMany()
+            .HasForeignKey(g => g.BudgetCategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<GivingEntry>()
+            .Property(g => g.Amount)
+            .HasColumnType("TEXT");
     }
 }

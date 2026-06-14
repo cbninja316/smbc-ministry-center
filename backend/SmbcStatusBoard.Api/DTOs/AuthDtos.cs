@@ -13,3 +13,7 @@ public record ForgotPasswordRequest(string Email);
 public record ResetPasswordRequest(string Token, string Password);
 
 public record ChangePasswordRequest(string NewPassword);
+
+public record RegisterRequest(string FirstName, string LastName, string Email, string Password, string ConfirmPassword);
+
+public record UpdateUserRoleRequest(string Role);

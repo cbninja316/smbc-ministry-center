@@ -95,6 +95,30 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         return Ok(new { message = "Permissions updated." });
     }
 
+    [HttpPut("{id}/role")]
+    public async Task<IActionResult> UpdateRole(int id, [FromBody] UpdateUserRoleRequest req)
+    {
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        if (!Enum.TryParse<UserRole>(req.Role, true, out var newRole))
+            return BadRequest(new { message = "Invalid role." });
+
+        var oldRole = user.Role;
+        user.Role = newRole;
+        await db.SaveChangesAsync();
+
+        if (newRole != UserRole.Member && newRole != oldRole)
+        {
+            var frontendUrl = config["App:NextFrontendUrl"] ?? "https://oneaccord.southmoorebc.org";
+            var displayName = $"{user.FirstName} {user.LastName}".Trim();
+            if (string.IsNullOrEmpty(displayName)) displayName = user.Username;
+            await emailService.SendRolePromotionAsync(user.Email, displayName, newRole.ToString(), frontendUrl + "/login");
+        }
+
+        return Ok(new { message = "Role updated." });
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
