@@ -16,13 +16,22 @@ public class GivingController(AppDbContext db) : ControllerBase
     [HttpGet("categories")]
     public async Task<IActionResult> GetCategories()
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var cats = await db.BudgetCategories
             .Where(c => c.IsIncome)
             .OrderBy(c => c.SortOrder)
-            .Select(c => new { c.Id, c.Name, c.ColorHex })
             .ToListAsync();
 
-        return Ok(cats);
+        // Exclude periodic categories whose window has closed for this year
+        var active = cats.Where(c =>
+        {
+            if (!c.PeriodStartMonth.HasValue || !c.PeriodEndMonth.HasValue) return true;
+            var start = new DateOnly(today.Year, c.PeriodStartMonth.Value, c.PeriodStartDay!.Value);
+            var end   = new DateOnly(today.Year, c.PeriodEndMonth.Value,   c.PeriodEndDay!.Value);
+            return today >= start && today <= end;
+        });
+
+        return Ok(active.Select(c => new { c.Id, c.Name, c.ColorHex }));
     }
 
     // POST /api/giving — log a giving entry for the authenticated user
