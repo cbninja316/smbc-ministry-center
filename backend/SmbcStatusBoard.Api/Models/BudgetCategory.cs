@@ -34,5 +34,15 @@ public class BudgetCategory
     public int? SalaryUserId { get; set; }
     public User? SalaryUser { get; set; }
 
+    /// <summary>
+    /// Optional recurring period. When all four are set, this category is only active
+    /// between (PeriodStartMonth/PeriodStartDay) and (PeriodEndMonth/PeriodEndDay) each year.
+    /// YearlyAllocatedAmount holds the total expected for the period.
+    /// </summary>
+    public int? PeriodStartMonth { get; set; }
+    public int? PeriodStartDay   { get; set; }
+    public int? PeriodEndMonth   { get; set; }
+    public int? PeriodEndDay     { get; set; }
+
     public ICollection<BudgetEntry> Entries { get; set; } = new List<BudgetEntry>();
 }

@@ -36,6 +36,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
             // Only super admins see the linked user
             salaryUserId   = superAdmin ? c.SalaryUserId   : (int?)null,
             salaryUserName = superAdmin ? (c.SalaryUser != null ? $"{c.SalaryUser.FirstName} {c.SalaryUser.LastName}".Trim() : null) : null,
+            c.PeriodStartMonth, c.PeriodStartDay, c.PeriodEndMonth, c.PeriodEndDay,
         }));
     }
 
@@ -54,6 +55,10 @@ public class BudgetController(AppDbContext db) : ControllerBase
             SortOrder = await db.BudgetCategories.CountAsync(),
             IsSalary = req.IsSalary,
             SalaryUserId = req.IsSalary ? req.SalaryUserId : null,
+            PeriodStartMonth = req.PeriodStartMonth,
+            PeriodStartDay   = req.PeriodStartDay,
+            PeriodEndMonth   = req.PeriodEndMonth,
+            PeriodEndDay     = req.PeriodEndDay,
         };
         db.BudgetCategories.Add(cat);
         await db.SaveChangesAsync();
@@ -74,6 +79,10 @@ public class BudgetController(AppDbContext db) : ControllerBase
         cat.ColorHex = req.ColorHex ?? cat.ColorHex;
         cat.IsSalary = req.IsSalary;
         cat.SalaryUserId = req.IsSalary ? req.SalaryUserId : null;
+        cat.PeriodStartMonth = req.PeriodStartMonth;
+        cat.PeriodStartDay   = req.PeriodStartDay;
+        cat.PeriodEndMonth   = req.PeriodEndMonth;
+        cat.PeriodEndDay     = req.PeriodEndDay;
         await db.SaveChangesAsync();
         return Ok(cat);
     }
@@ -300,6 +309,23 @@ public class BudgetController(AppDbContext db) : ControllerBase
             var ytdSpent = allYearEntries.Where(e => e.BudgetCategoryId == c.Id).Sum(e => e.Amount);
             var redact = c.IsSalary && !isSuperAdminSummary;
             var yearlyAlloc = c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
+
+            // Periodic category: treat as yearly-only; allocatedAmount = 0 when outside active window
+            var isPeriodic = c.PeriodStartMonth.HasValue && c.PeriodStartDay.HasValue
+                          && c.PeriodEndMonth.HasValue   && c.PeriodEndDay.HasValue;
+            var effectiveMonthly = c.AllocatedAmount;
+            if (isPeriodic)
+            {
+                var periodStart = new DateOnly(year, c.PeriodStartMonth!.Value, c.PeriodStartDay!.Value);
+                var periodEnd   = new DateOnly(year, c.PeriodEndMonth!.Value,   c.PeriodEndDay!.Value);
+                var monthDate   = new DateOnly(year, month, 1);
+                var monthEnd    = new DateOnly(year, month, DateTime.DaysInMonth(year, month));
+                // Active if any day of the current month overlaps the period
+                effectiveMonthly = (monthDate <= periodEnd && monthEnd >= periodStart)
+                    ? c.YearlyAllocatedAmount   // show the lump sum when in-period
+                    : 0m;
+            }
+
             return new
             {
                 c.Id,
@@ -308,10 +334,11 @@ public class BudgetController(AppDbContext db) : ControllerBase
                 c.IsIncome,
                 c.ColorHex,
                 c.IsSalary,
-                AllocatedAmount = redact ? 0m : c.AllocatedAmount,
+                AllocatedAmount = redact ? 0m : effectiveMonthly,
                 YearlyAllocatedAmount = redact ? 0m : yearlyAlloc,
                 Spent = spent,
                 YtdSpent = ytdSpent,
+                c.PeriodStartMonth, c.PeriodStartDay, c.PeriodEndMonth, c.PeriodEndDay,
             };
         }).ToList();
 
@@ -498,7 +525,11 @@ public class BudgetController(AppDbContext db) : ControllerBase
         bool IsIncome,
         string? ColorHex,
         bool IsSalary = false,
-        int? SalaryUserId = null
+        int? SalaryUserId = null,
+        int? PeriodStartMonth = null,
+        int? PeriodStartDay   = null,
+        int? PeriodEndMonth   = null,
+        int? PeriodEndDay     = null
     );
 
     public record EntryRequest(
