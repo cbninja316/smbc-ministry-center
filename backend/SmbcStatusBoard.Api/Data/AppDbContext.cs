@@ -20,6 +20,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<GivingEntry> GivingEntries => Set<GivingEntry>();
+    public DbSet<BudgetCategoryAmountHistory> BudgetCategoryAmountHistories => Set<BudgetCategoryAmountHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -130,6 +131,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<GivingEntry>()
             .Property(g => g.Amount)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BudgetCategoryAmountHistory>()
+            .HasOne(h => h.Category)
+            .WithMany()
+            .HasForeignKey(h => h.BudgetCategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<BudgetCategoryAmountHistory>()
+            .HasIndex(h => new { h.BudgetCategoryId, h.Year, h.Month })
+            .IsUnique();
+
+        modelBuilder.Entity<BudgetCategoryAmountHistory>()
+            .Property(h => h.AllocatedAmount)
             .HasColumnType("TEXT");
     }
 }

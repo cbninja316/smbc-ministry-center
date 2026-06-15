@@ -97,6 +97,48 @@ public class BudgetController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Upsert a monthly amount override for a category, effective from (year, month) forward.
+    /// Does not affect entries or summaries from months before this one.
+    /// </summary>
+    [HttpPut("categories/{id}/monthly-amount")]
+    public async Task<IActionResult> SetMonthlyAmount(int id, [FromBody] MonthlyAmountRequest req)
+    {
+        if (!IsSuperAdmin()) return Forbid();
+        var cat = await db.BudgetCategories.FindAsync(id);
+        if (cat is null) return NotFound();
+
+        var existing = await db.BudgetCategoryAmountHistories
+            .FirstOrDefaultAsync(h => h.BudgetCategoryId == id && h.Year == req.Year && h.Month == req.Month);
+
+        if (existing is not null)
+            existing.AllocatedAmount = req.AllocatedAmount;
+        else
+            db.BudgetCategoryAmountHistories.Add(new BudgetCategoryAmountHistory
+            {
+                BudgetCategoryId = id,
+                Year  = req.Year,
+                Month = req.Month,
+                AllocatedAmount = req.AllocatedAmount,
+            });
+
+        await db.SaveChangesAsync();
+        return Ok(new { id, req.Year, req.Month, req.AllocatedAmount });
+    }
+
+    /// <summary>Returns all amount history entries for a category.</summary>
+    [HttpGet("categories/{id}/amount-history")]
+    public async Task<IActionResult> GetAmountHistory(int id)
+    {
+        if (!IsSuperAdmin()) return Forbid();
+        var history = await db.BudgetCategoryAmountHistories
+            .Where(h => h.BudgetCategoryId == id)
+            .OrderBy(h => h.Year).ThenBy(h => h.Month)
+            .Select(h => new { h.Year, h.Month, h.AllocatedAmount })
+            .ToListAsync();
+        return Ok(history);
+    }
+
     [HttpPatch("categories/reorder")]
     public async Task<IActionResult> ReorderCategories([FromBody] List<int> orderedIds)
     {
@@ -271,6 +313,18 @@ public class BudgetController(AppDbContext db) : ControllerBase
         var entries = await db.BudgetEntries
             .Where(e => e.Date >= start && e.Date < end)
             .ToListAsync();
+        var amountHistory = await db.BudgetCategoryAmountHistories.ToListAsync();
+
+        // Effective monthly amount: most recent history entry <= (year, month), else base AllocatedAmount
+        decimal EffectiveAmount(BudgetCategory c, int y, int m)
+        {
+            var h = amountHistory
+                .Where(h => h.BudgetCategoryId == c.Id &&
+                            (h.Year < y || (h.Year == y && h.Month <= m)))
+                .OrderByDescending(h => h.Year).ThenByDescending(h => h.Month)
+                .FirstOrDefault();
+            return h?.AllocatedAmount ?? c.AllocatedAmount;
+        }
 
         // Yearly-only or periodic categories are excluded from the line graph
         static bool IsYearlyTracked(BudgetCategory c) =>
@@ -280,8 +334,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
         var graphExpenseCategories = categories.Where(c => !c.IsIncome && !IsYearlyTracked(c)).ToList();
         var graphIncomeCategories  = categories.Where(c => c.IsIncome  && !IsYearlyTracked(c)).ToList();
 
-        var totalAllocatedExpense = graphExpenseCategories.Sum(c => c.AllocatedAmount);
-        var totalAllocatedIncome  = graphIncomeCategories.Sum(c => c.AllocatedAmount);
+        var totalAllocatedExpense = graphExpenseCategories.Sum(c => EffectiveAmount(c, year, month));
+        var totalAllocatedIncome  = graphIncomeCategories.Sum(c => EffectiveAmount(c, year, month));
         var totalSpentExpense = entries
             .Where(e => graphExpenseCategories.Any(c => c.Id == e.BudgetCategoryId))
             .Sum(e => e.Amount);
@@ -321,7 +375,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
             // Periodic category: treat as yearly-only; allocatedAmount = 0 when outside active window
             var isPeriodic = c.PeriodStartMonth.HasValue && c.PeriodStartDay.HasValue
                           && c.PeriodEndMonth.HasValue   && c.PeriodEndDay.HasValue;
-            var effectiveMonthly = c.AllocatedAmount;
+            var effectiveMonthly = EffectiveAmount(c, year, month);
             if (isPeriodic)
             {
                 var periodStart = new DateOnly(year, c.PeriodStartMonth!.Value, c.PeriodStartDay!.Value);
@@ -458,6 +512,19 @@ public class BudgetController(AppDbContext db) : ControllerBase
         var entries = await db.BudgetEntries
             .Where(e => e.Date >= yearStart && e.Date < yearEnd)
             .ToListAsync();
+        var amountHistoryBd = await db.BudgetCategoryAmountHistories
+            .Where(h => h.Year <= year)
+            .ToListAsync();
+
+        decimal EffectiveAmountBd(BudgetCategory c, int m)
+        {
+            var h = amountHistoryBd
+                .Where(h => h.BudgetCategoryId == c.Id &&
+                            (h.Year < year || (h.Year == year && h.Month <= m)))
+                .OrderByDescending(h => h.Year).ThenByDescending(h => h.Month)
+                .FirstOrDefault();
+            return h?.AllocatedAmount ?? c.AllocatedAmount;
+        }
 
         static decimal YearlyAlloc(BudgetCategory c) =>
             c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
@@ -470,6 +537,11 @@ public class BudgetController(AppDbContext db) : ControllerBase
                 monthlySpent[e.Date.Month] += e.Amount;
 
             var redact = c.IsSalary && !superAdmin;
+            // Per-month effective allocated amounts (12 elements, index 0 = Jan)
+            var monthlyAllocated = Enumerable.Range(1, 12)
+                .Select(m => redact ? 0m : EffectiveAmountBd(c, m))
+                .ToArray();
+
             return new
             {
                 c.Id,
@@ -478,8 +550,9 @@ public class BudgetController(AppDbContext db) : ControllerBase
                 c.IsIncome,
                 c.ColorHex,
                 c.IsSalary,
-                AllocatedAmount       = redact ? 0m : c.AllocatedAmount,
+                AllocatedAmount       = redact ? 0m : EffectiveAmountBd(c, DateTime.UtcNow.Month),
                 YearlyAllocatedAmount = redact ? 0m : YearlyAlloc(c),
+                MonthlyAllocated = monthlyAllocated,
                 // 12 elements, index 0 = Jan, index 11 = Dec
                 MonthlySpent = Enumerable.Range(1, 12).Select(m => monthlySpent[m]).ToArray(),
                 YtdSpent = monthlySpent.Skip(1).Sum(),
@@ -552,5 +625,11 @@ public class BudgetController(AppDbContext db) : ControllerBase
     public record AssignReceiptRequest(
         int BudgetCategoryId,
         string? Notes
+    );
+
+    public record MonthlyAmountRequest(
+        int Year,
+        int Month,
+        decimal AllocatedAmount
     );
 }
