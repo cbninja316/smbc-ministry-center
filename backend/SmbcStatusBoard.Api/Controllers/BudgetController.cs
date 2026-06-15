@@ -291,10 +291,15 @@ public class BudgetController(AppDbContext db) : ControllerBase
 
         // Per-category breakdown
         var isSuperAdminSummary = IsSuperAdmin();
+        var allYearEntries = await db.BudgetEntries
+            .Where(e => e.Date.Year == year && categories.Select(c => c.Id).Contains(e.BudgetCategoryId))
+            .ToListAsync();
         var categoryBreakdown = categories.Select(c =>
         {
             var spent = entries.Where(e => e.BudgetCategoryId == c.Id).Sum(e => e.Amount);
+            var ytdSpent = allYearEntries.Where(e => e.BudgetCategoryId == c.Id).Sum(e => e.Amount);
             var redact = c.IsSalary && !isSuperAdminSummary;
+            var yearlyAlloc = c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
             return new
             {
                 c.Id,
@@ -304,7 +309,9 @@ public class BudgetController(AppDbContext db) : ControllerBase
                 c.ColorHex,
                 c.IsSalary,
                 AllocatedAmount = redact ? 0m : c.AllocatedAmount,
+                YearlyAllocatedAmount = redact ? 0m : yearlyAlloc,
                 Spent = spent,
+                YtdSpent = ytdSpent,
             };
         }).ToList();
 
