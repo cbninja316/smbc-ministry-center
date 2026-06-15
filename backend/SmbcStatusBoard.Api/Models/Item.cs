@@ -34,6 +34,10 @@ public class Item
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
     public int SortOrder { get; set; } = 0;
 
+    /// <summary>Set when an authenticated user submits through the my-requests page.</summary>
+    public int? SubmittedByUserId { get; set; }
+    public User? SubmittedByUser { get; set; }
+
     [JsonIgnore]
     public string? BenevolenceData { get; set; }
 
