@@ -272,22 +272,30 @@ public class BudgetController(AppDbContext db) : ControllerBase
             .Where(e => e.Date >= start && e.Date < end)
             .ToListAsync();
 
-        var totalAllocatedExpense = categories.Where(c => !c.IsIncome).Sum(c => c.AllocatedAmount);
-        var totalAllocatedIncome  = categories.Where(c => c.IsIncome).Sum(c => c.AllocatedAmount);
+        // Yearly-only or periodic categories are excluded from the line graph
+        static bool IsYearlyTracked(BudgetCategory c) =>
+            (c.AllocatedAmount == 0 && c.YearlyAllocatedAmount > 0) ||
+            (c.PeriodStartMonth.HasValue && c.PeriodEndMonth.HasValue);
+
+        var graphExpenseCategories = categories.Where(c => !c.IsIncome && !IsYearlyTracked(c)).ToList();
+        var graphIncomeCategories  = categories.Where(c => c.IsIncome  && !IsYearlyTracked(c)).ToList();
+
+        var totalAllocatedExpense = graphExpenseCategories.Sum(c => c.AllocatedAmount);
+        var totalAllocatedIncome  = graphIncomeCategories.Sum(c => c.AllocatedAmount);
         var totalSpentExpense = entries
-            .Where(e => !categories.FirstOrDefault(c => c.Id == e.BudgetCategoryId)?.IsIncome ?? false)
+            .Where(e => graphExpenseCategories.Any(c => c.Id == e.BudgetCategoryId))
             .Sum(e => e.Amount);
         var totalSpentIncome = entries
-            .Where(e => categories.FirstOrDefault(c => c.Id == e.BudgetCategoryId)?.IsIncome ?? false)
+            .Where(e => graphIncomeCategories.Any(c => c.Id == e.BudgetCategoryId))
             .Sum(e => e.Amount);
 
-        // Build daily cumulative expense spending for the graph
+        // Build daily cumulative expense spending for the graph (excludes yearly/periodic)
         var dailyCumulative = new decimal[daysInMonth + 1]; // index 1..daysInMonth
         foreach (var entry in entries)
         {
             var entryDay = entry.Date.Day;
-            var cat = categories.FirstOrDefault(c => c.Id == entry.BudgetCategoryId);
-            if (cat is not null && !cat.IsIncome && entryDay >= 1 && entryDay <= daysInMonth)
+            var cat = graphExpenseCategories.FirstOrDefault(c => c.Id == entry.BudgetCategoryId);
+            if (cat is not null && entryDay >= 1 && entryDay <= daysInMonth)
                 dailyCumulative[entryDay] += entry.Amount;
         }
         // Make it cumulative
