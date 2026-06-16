@@ -209,6 +209,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
             Description = req.Description,
             Notes = req.Notes,
             ReceiptId = req.ReceiptId,
+            DueDate = req.DueDate,
         };
         db.BudgetEntries.Add(entry);
         await db.SaveChangesAsync();
@@ -262,6 +263,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
         entry.Date = req.Date.ToUniversalTime();
         entry.Description = req.Description;
         entry.Notes = req.Notes;
+        entry.DueDate = req.DueDate;
         await db.SaveChangesAsync();
         await db.Entry(entry).Reference(e => e.Category).LoadAsync();
         return Ok(MapEntry(entry));
@@ -622,6 +624,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
         e.Description,
         e.Notes,
         e.ReceiptId,
+        e.DueDate,
     };
 
     // ── Request DTOs ──────────────────────────────────────────────────────────
@@ -647,7 +650,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
         DateTime Date,
         string Description,
         string? Notes,
-        int? ReceiptId
+        int? ReceiptId,
+        string? DueDate = null
     );
 
     public record AssignReceiptRequest(

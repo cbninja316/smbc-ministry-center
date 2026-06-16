@@ -12,6 +12,8 @@ public class BudgetEntry
     public string Description { get; set; } = string.Empty;
     public string? Notes { get; set; }
 
+    public string? DueDate { get; set; }  // ISO date "yyyy-MM-dd", optional payment due date
+
     /// <summary>If this entry was created from a receipt, links back to it</summary>
     public int? ReceiptId { get; set; }
     public Receipt? Receipt { get; set; }

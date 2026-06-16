@@ -22,6 +22,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GivingEntry> GivingEntries => Set<GivingEntry>();
     public DbSet<BudgetCategoryAmountHistory> BudgetCategoryAmountHistories => Set<BudgetCategoryAmountHistory>();
     public DbSet<BudgetTypeOrder> BudgetTypeOrders => Set<BudgetTypeOrder>();
+    public DbSet<Debt> Debts => Set<Debt>();
+    public DbSet<DebtPayment> DebtPayments => Set<DebtPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -151,5 +153,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<BudgetTypeOrder>()
             .HasIndex(t => t.TypeName)
             .IsUnique();
+
+        modelBuilder.Entity<Debt>()
+            .Property(d => d.PrincipalAmount)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<Debt>()
+            .Property(d => d.InterestRate)
+            .HasColumnType("TEXT");
+
+        modelBuilder.Entity<DebtPayment>()
+            .HasOne(p => p.Debt)
+            .WithMany(d => d.Payments)
+            .HasForeignKey(p => p.DebtId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DebtPayment>()
+            .Property(p => p.ExtraPrincipal)
+            .HasColumnType("TEXT");
     }
 }
