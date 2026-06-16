@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<GivingEntry> GivingEntries => Set<GivingEntry>();
     public DbSet<BudgetCategoryAmountHistory> BudgetCategoryAmountHistories => Set<BudgetCategoryAmountHistory>();
+    public DbSet<BudgetTypeOrder> BudgetTypeOrders => Set<BudgetTypeOrder>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -146,5 +147,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<BudgetCategoryAmountHistory>()
             .Property(h => h.AllocatedAmount)
             .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BudgetTypeOrder>()
+            .HasIndex(t => t.TypeName)
+            .IsUnique();
     }
 }

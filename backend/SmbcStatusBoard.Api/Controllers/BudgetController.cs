@@ -138,6 +138,39 @@ public class BudgetController(AppDbContext db) : ControllerBase
         return Ok(history);
     }
 
+    // ── Type order ────────────────────────────────────────────────────────────
+
+    [HttpGet("type-order")]
+    public async Task<IActionResult> GetTypeOrder()
+    {
+        var order = await db.BudgetTypeOrders
+            .OrderBy(t => t.SortOrder)
+            .Select(t => t.TypeName)
+            .ToListAsync();
+        return Ok(order);
+    }
+
+    [HttpPut("type-order")]
+    public async Task<IActionResult> SetTypeOrder([FromBody] List<string> orderedTypes)
+    {
+        if (!IsSuperAdmin()) return Forbid();
+        var existing = await db.BudgetTypeOrders.ToListAsync();
+        for (var i = 0; i < orderedTypes.Count; i++)
+        {
+            var typeName = orderedTypes[i];
+            var row = existing.FirstOrDefault(t => t.TypeName == typeName);
+            if (row is not null)
+                row.SortOrder = i;
+            else
+                db.BudgetTypeOrders.Add(new BudgetTypeOrder { TypeName = typeName, SortOrder = i });
+        }
+        // Remove any rows for types that no longer exist
+        foreach (var row in existing.Where(t => !orderedTypes.Contains(t.TypeName)))
+            db.BudgetTypeOrders.Remove(row);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpPatch("categories/reorder")]
     public async Task<IActionResult> ReorderCategories([FromBody] List<int> orderedIds)
     {
