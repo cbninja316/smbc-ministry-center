@@ -148,7 +148,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
             if (cat is not null) cat.SortOrder = i;
         }
         await db.SaveChangesAsync();
-        return Ok();
+        return NoContent();
     }
 
     // ── Entries ───────────────────────────────────────────────────────────────
@@ -272,7 +272,7 @@ public class BudgetController(AppDbContext db) : ControllerBase
         if (receipt is null) return NotFound();
         receipt.BudgetDismissed = true;
         await db.SaveChangesAsync();
-        return Ok();
+        return NoContent();
     }
 
     [HttpPost("receipts/{id}/assign")]
