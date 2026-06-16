@@ -90,7 +90,7 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
                     ("Requested By", req.RequestedBy),
                     ("Email",        req.Email ?? ""),
                     ("Description",  req.Description),
-                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                    ("Submitted",    TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time")).ToString("MMMM d, yyyy h:mm tt") + " CT"),
                 },
                 ItemType.Maintenance => new List<(string, string)>
                 {
@@ -99,7 +99,7 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
                     ("Urgency",      req.Urgency?.ToString() ?? ""),
                     ("Date Needed",  req.EventDate?.ToString("MMMM d, yyyy") ?? ""),
                     ("Details",      req.Description),
-                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                    ("Submitted",    TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time")).ToString("MMMM d, yyyy h:mm tt") + " CT"),
                 },
                 ItemType.FacilityUse => new List<(string, string)>
                 {
@@ -107,7 +107,7 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
                     ("Requested By", req.RequestedBy),
                     ("Event Date",   req.EventDate?.ToString("MMMM d, yyyy") ?? ""),
                     ("Description",  req.Description),
-                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                    ("Submitted",    TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time")).ToString("MMMM d, yyyy h:mm tt") + " CT"),
                 },
                 ItemType.ChurchEvent => new List<(string, string)>
                 {
@@ -121,7 +121,7 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
                     ("Location",     req.ChurchEventData?.Location ?? ""),
                     ("Cost",         req.ChurchEventData?.Cost?.ToString("C") ?? ""),
                     ("Description",  req.Description),
-                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                    ("Submitted",    TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time")).ToString("MMMM d, yyyy h:mm tt") + " CT"),
                 },
                 ItemType.Benevolence => new List<(string, string)>
                 {
@@ -137,13 +137,13 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
                     ("Date Needed",  req.BenevolenceData?.DateNeeded ?? ""),
                     ("Relationship", req.BenevolenceData?.RelationshipToChurch ?? ""),
                     ("Reason",       req.Description),
-                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                    ("Submitted",    TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time")).ToString("MMMM d, yyyy h:mm tt") + " CT"),
                 },
                 _ => new List<(string, string)>
                 {
                     ("Requested By", req.RequestedBy),
                     ("Description",  req.Description),
-                    ("Submitted",    DateTime.UtcNow.ToString("MMMM d, yyyy h:mm tt") + " UTC"),
+                    ("Submitted",    TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Central Standard Time")).ToString("MMMM d, yyyy h:mm tt") + " CT"),
                 }
             };
 
