@@ -30,9 +30,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
         return Ok(cats.Select(c => new
         {
             c.Id, c.TypeName, c.Name, c.IsIncome, c.ColorHex, c.SortOrder, c.IsSalary,
-            // Non-super-admins see zero amounts for salary categories
-            allocatedAmount       = (c.IsSalary && !superAdmin) ? 0m : c.AllocatedAmount,
-            yearlyAllocatedAmount = (c.IsSalary && !superAdmin) ? 0m : c.YearlyAllocatedAmount,
+            allocatedAmount       = c.AllocatedAmount,
+            yearlyAllocatedAmount = c.YearlyAllocatedAmount,
             // Only super admins see the linked user
             salaryUserId   = superAdmin ? c.SalaryUserId   : (int?)null,
             salaryUserName = superAdmin ? (c.SalaryUser != null ? $"{c.SalaryUser.FirstName} {c.SalaryUser.LastName}".Trim() : null) : null,
@@ -361,7 +360,6 @@ public class BudgetController(AppDbContext db) : ControllerBase
             .ToList();
 
         // Per-category breakdown
-        var isSuperAdminSummary = IsSuperAdmin();
         var allYearEntries = await db.BudgetEntries
             .Where(e => e.Date.Year == year && categories.Select(c => c.Id).Contains(e.BudgetCategoryId))
             .ToListAsync();
@@ -369,7 +367,6 @@ public class BudgetController(AppDbContext db) : ControllerBase
         {
             var spent = entries.Where(e => e.BudgetCategoryId == c.Id).Sum(e => e.Amount);
             var ytdSpent = allYearEntries.Where(e => e.BudgetCategoryId == c.Id).Sum(e => e.Amount);
-            var redact = c.IsSalary && !isSuperAdminSummary;
             var yearlyAlloc = c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
 
             // Periodic category: treat as yearly-only; allocatedAmount = 0 when outside active window
@@ -396,8 +393,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
                 c.IsIncome,
                 c.ColorHex,
                 c.IsSalary,
-                AllocatedAmount = redact ? 0m : effectiveMonthly,
-                YearlyAllocatedAmount = redact ? 0m : yearlyAlloc,
+                AllocatedAmount = effectiveMonthly,
+                YearlyAllocatedAmount = yearlyAlloc,
                 Spent = spent,
                 YtdSpent = ytdSpent,
                 c.PeriodStartMonth, c.PeriodStartDay, c.PeriodEndMonth, c.PeriodEndDay,
@@ -529,17 +526,15 @@ public class BudgetController(AppDbContext db) : ControllerBase
         static decimal YearlyAlloc(BudgetCategory c) =>
             c.YearlyAllocatedAmount > 0 ? c.YearlyAllocatedAmount : c.AllocatedAmount * 12;
 
-        var superAdmin = IsSuperAdmin();
         var categoryData = categories.Select(c =>
         {
             var monthlySpent = new decimal[13]; // 1-indexed; index 0 unused
             foreach (var e in entries.Where(e => e.BudgetCategoryId == c.Id))
                 monthlySpent[e.Date.Month] += e.Amount;
 
-            var redact = c.IsSalary && !superAdmin;
             // Per-month effective allocated amounts (12 elements, index 0 = Jan)
             var monthlyAllocated = Enumerable.Range(1, 12)
-                .Select(m => redact ? 0m : EffectiveAmountBd(c, m))
+                .Select(m => EffectiveAmountBd(c, m))
                 .ToArray();
 
             return new
@@ -550,8 +545,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
                 c.IsIncome,
                 c.ColorHex,
                 c.IsSalary,
-                AllocatedAmount       = redact ? 0m : EffectiveAmountBd(c, DateTime.UtcNow.Month),
-                YearlyAllocatedAmount = redact ? 0m : YearlyAlloc(c),
+                AllocatedAmount       = EffectiveAmountBd(c, DateTime.UtcNow.Month),
+                YearlyAllocatedAmount = YearlyAlloc(c),
                 MonthlyAllocated = monthlyAllocated,
                 // 12 elements, index 0 = Jan, index 11 = Dec
                 MonthlySpent = Enumerable.Range(1, 12).Select(m => monthlySpent[m]).ToArray(),
@@ -575,8 +570,8 @@ public class BudgetController(AppDbContext db) : ControllerBase
             monthlyExpenseTotals,
             ytdIncome  = monthlyIncomeTotals.Sum(),
             ytdExpense = monthlyExpenseTotals.Sum(),
-            totalYearlyIncome  = categories.Where(c => c.IsIncome).Sum(c => (!superAdmin && c.IsSalary) ? 0m : YearlyAlloc(c)),
-            totalYearlyExpense = categories.Where(c => !c.IsIncome).Sum(c => (!superAdmin && c.IsSalary) ? 0m : YearlyAlloc(c)),
+            totalYearlyIncome  = categories.Where(c => c.IsIncome).Sum(YearlyAlloc),
+            totalYearlyExpense = categories.Where(c => !c.IsIncome).Sum(YearlyAlloc),
         });
     }
 
