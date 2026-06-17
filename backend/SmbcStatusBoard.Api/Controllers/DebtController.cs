@@ -116,7 +116,7 @@ public class DebtController(AppDbContext db) : ControllerBase
         d.DueDate,
         d.Notes,
         d.CreatedAt,
-        Payments = d.Payments.Select(MapPayment).OrderBy(p => ((dynamic)p).date),
+        Payments = d.Payments.OrderBy(p => p.Date).Select(MapPayment),
     };
 
     private static object MapPayment(DebtPayment p) => new
