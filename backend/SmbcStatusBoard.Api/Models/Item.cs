@@ -50,6 +50,8 @@ public class Item
     [JsonIgnore]
     public string? ChurchEventData { get; set; }
 
+    public string? CompletionNote { get; set; }
+
     public ICollection<EventPhoto> EventPhotos { get; set; } = new List<EventPhoto>();
 
     [NotMapped]

@@ -266,7 +266,7 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendItemCompletedAsync(string toEmail, string toName, string typeLabel, List<(string Label, string Value)> details)
+    public async Task SendItemCompletedAsync(string toEmail, string toName, string typeLabel, List<(string Label, string Value)> details, string? completionNote = null)
     {
         var rows = string.Join("", details
             .Where(d => !string.IsNullOrWhiteSpace(d.Value))
@@ -288,6 +288,12 @@ public class EmailService(IConfiguration config)
                   <p style="margin:0 0 20px;color:#374151;">
                     Great news — your request has been marked as completed. Here is a summary of what was submitted:
                   </p>
+                  {(string.IsNullOrWhiteSpace(completionNote) ? "" : $"""
+                  <div style="margin:0 0 20px;padding:14px 18px;background:#f0fdf4;border-left:4px solid #059669;border-radius:4px;">
+                    <p style="margin:0 0 6px;font-weight:700;font-size:0.85rem;color:#065f46;text-transform:uppercase;letter-spacing:0.04em;">Note from the office</p>
+                    <p style="margin:0;color:#111827;white-space:pre-wrap;">{System.Net.WebUtility.HtmlEncode(completionNote)}</p>
+                  </div>
+                  """)}
                   <table style="width:100%;border-collapse:collapse;font-size:0.9rem;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
                     {rows}
                   </table>

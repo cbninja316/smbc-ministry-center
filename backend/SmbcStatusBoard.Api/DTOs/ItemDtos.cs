@@ -60,7 +60,7 @@ public class BenevolenceData
 
 public record ItemStatusUpdate(ItemStatus Status, int SortOrder);
 
-public record ItemReorderRequest(int Id, ItemStatus Status, int SortOrder);
+public record ItemReorderRequest(int Id, ItemStatus Status, int SortOrder, string? CompletionNote = null);
 
 public record ReceiptResponse(
     int Id,

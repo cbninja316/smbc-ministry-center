@@ -146,7 +146,7 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
     [HttpPatch("reorder")]
     public async Task<IActionResult> Reorder([FromBody] List<ItemReorderRequest> updates)
     {
-        var completedItems = new List<Item>();
+        var completedItems = new List<(Item Item, string? Note)>();
 
         foreach (var update in updates)
         {
@@ -157,19 +157,21 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
             if (update.Status == ItemStatus.Done && item.Status != ItemStatus.Done
                 && !string.IsNullOrWhiteSpace(item.Email))
             {
-                completedItems.Add(item);
+                completedItems.Add((item, update.CompletionNote));
             }
 
             item.Status = update.Status;
             item.SortOrder = update.SortOrder;
+            if (update.Status == ItemStatus.Done && !string.IsNullOrWhiteSpace(update.CompletionNote))
+                item.CompletionNote = update.CompletionNote.Trim();
         }
 
         await db.SaveChangesAsync();
 
         // Send completion emails (fire-and-forget; don't let email errors fail the response)
-        foreach (var item in completedItems)
+        foreach (var (item, note) in completedItems)
         {
-            try { await SendCompletionEmailAsync(item); }
+            try { await SendCompletionEmailAsync(item, note); }
             catch { /* best-effort */ }
         }
 
@@ -185,7 +187,7 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
         [ItemType.SecretaryRequest]   = "Secretary Request",
     };
 
-    private async Task SendCompletionEmailAsync(Item item)
+    private async Task SendCompletionEmailAsync(Item item, string? note = null)
     {
         var typeLabel = TypeLabels.GetValueOrDefault(item.Type, item.Type.ToString());
         var details = new List<(string Label, string Value)>();
@@ -228,7 +230,7 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
                 }));
         }
 
-        await email.SendItemCompletedAsync(item.Email!, item.RequestedBy, typeLabel, details);
+        await email.SendItemCompletedAsync(item.Email!, item.RequestedBy, typeLabel, details, note);
     }
 
     private async Task AutoAdvanceStatusAsync()
