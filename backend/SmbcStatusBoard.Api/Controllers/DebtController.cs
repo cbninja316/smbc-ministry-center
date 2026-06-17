@@ -41,10 +41,12 @@ public class DebtController(AppDbContext db) : ControllerBase
             MonthsIn = req.MonthsIn,
             DueDate = req.DueDate,
             Notes = req.Notes,
+            BudgetCategoryId = req.BudgetCategoryId,
         };
         db.Debts.Add(debt);
         await db.SaveChangesAsync();
         await db.Entry(debt).Collection(d => d.Payments).LoadAsync();
+        await SyncDebtEntries(debt);
         return Ok(MapDebt(debt));
     }
 
@@ -60,7 +62,9 @@ public class DebtController(AppDbContext db) : ControllerBase
         debt.MonthsIn = req.MonthsIn;
         debt.DueDate = req.DueDate;
         debt.Notes = req.Notes;
+        debt.BudgetCategoryId = req.BudgetCategoryId;
         await db.SaveChangesAsync();
+        await SyncDebtEntries(debt);
         return Ok(MapDebt(debt));
     }
 
@@ -69,6 +73,9 @@ public class DebtController(AppDbContext db) : ControllerBase
     {
         var debt = await db.Debts.FindAsync(id);
         if (debt is null) return NotFound();
+        // Remove auto-generated entries before deleting the debt
+        var entries = await db.BudgetEntries.Where(e => e.DebtId == id).ToListAsync();
+        db.BudgetEntries.RemoveRange(entries);
         db.Debts.Remove(debt);
         await db.SaveChangesAsync();
         return NoContent();
@@ -103,6 +110,59 @@ public class DebtController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    // ── Entry sync ───────────────────────────────────────────────────────────
+
+    private async Task SyncDebtEntries(Debt debt)
+    {
+        // Remove all previously auto-generated entries for this debt
+        var old = await db.BudgetEntries.Where(e => e.DebtId == debt.Id).ToListAsync();
+        db.BudgetEntries.RemoveRange(old);
+
+        if (debt.BudgetCategoryId is null || debt.MonthsIn <= 0)
+        {
+            await db.SaveChangesAsync();
+            return;
+        }
+
+        var monthly = CalcMonthlyPayment(debt.PrincipalAmount, debt.InterestRate, debt.LoanTermMonths);
+
+        // Determine the day of month to use for entries
+        int dueDay = 1;
+        if (!string.IsNullOrEmpty(debt.DueDate) && DateTime.TryParse(debt.DueDate, out var dueDt))
+            dueDay = dueDt.Day;
+
+        // Loan start = today minus monthsIn months
+        var today = DateTime.Today;
+        var loanStart = today.AddMonths(-debt.MonthsIn);
+
+        for (int n = 1; n <= debt.MonthsIn; n++)
+        {
+            var paymentMonth = loanStart.AddMonths(n);
+            var day = Math.Min(dueDay, DateTime.DaysInMonth(paymentMonth.Year, paymentMonth.Month));
+            var entryDate = new DateTime(paymentMonth.Year, paymentMonth.Month, day);
+
+            db.BudgetEntries.Add(new BudgetEntry
+            {
+                BudgetCategoryId = debt.BudgetCategoryId.Value,
+                DebtId = debt.Id,
+                Amount = Math.Round(monthly, 2),
+                Date = entryDate,
+                Description = $"{debt.Name} — Payment #{n}",
+            });
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    private static decimal CalcMonthlyPayment(decimal principal, decimal annualRate, int termMonths)
+    {
+        if (annualRate == 0 || termMonths == 0) return termMonths > 0 ? principal / termMonths : 0;
+        var r = (double)(annualRate / 100m / 12m);
+        var n = termMonths;
+        var pmt = (double)principal * r * Math.Pow(1 + r, n) / (Math.Pow(1 + r, n) - 1);
+        return (decimal)pmt;
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static object MapDebt(Debt d) => new
@@ -116,6 +176,7 @@ public class DebtController(AppDbContext db) : ControllerBase
         d.DueDate,
         d.Notes,
         d.CreatedAt,
+        d.BudgetCategoryId,
         Payments = d.Payments.OrderBy(p => p.Date).Select(MapPayment),
     };
 
@@ -135,7 +196,8 @@ public class DebtController(AppDbContext db) : ControllerBase
         int LoanTermMonths,
         int MonthsIn,
         string? DueDate,
-        string? Notes
+        string? Notes,
+        int? BudgetCategoryId
     );
 
     public record PaymentRequest(

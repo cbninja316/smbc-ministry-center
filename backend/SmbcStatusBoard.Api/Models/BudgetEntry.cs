@@ -17,4 +17,8 @@ public class BudgetEntry
     /// <summary>If this entry was created from a receipt, links back to it</summary>
     public int? ReceiptId { get; set; }
     public Receipt? Receipt { get; set; }
+
+    /// <summary>If this entry was auto-generated from a debt payment, links back to it</summary>
+    public int? DebtId { get; set; }
+    public Debt? Debt { get; set; }
 }

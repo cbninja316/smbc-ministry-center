@@ -171,5 +171,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<DebtPayment>()
             .Property(p => p.ExtraPrincipal)
             .HasColumnType("TEXT");
+
+        modelBuilder.Entity<BudgetEntry>()
+            .HasOne(e => e.Debt)
+            .WithMany()
+            .HasForeignKey(e => e.DebtId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

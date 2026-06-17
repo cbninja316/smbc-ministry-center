@@ -12,5 +12,8 @@ public class Debt
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public int? BudgetCategoryId { get; set; }
+    public BudgetCategory? BudgetCategory { get; set; }
+
     public ICollection<DebtPayment> Payments { get; set; } = [];
 }
