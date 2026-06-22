@@ -132,6 +132,26 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         return Ok(new { message = "Role updated." });
     }
 
+    // POST /api/users/{id}/verify — SuperAdmin manually activates a user who couldn't verify by email
+    [HttpPost("{id}/verify")]
+    public async Task<IActionResult> ManualVerify(int id)
+    {
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        user.EmailVerified = true;
+        user.IsActive = true;
+
+        // Mark any pending verification tokens as used
+        var tokens = await db.EmailVerificationTokens
+            .Where(t => t.UserId == id && !t.Used)
+            .ToListAsync();
+        foreach (var t in tokens) t.Used = true;
+
+        await db.SaveChangesAsync();
+        return Ok(new { message = "User verified and activated." });
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

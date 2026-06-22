@@ -119,7 +119,8 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         if (req.Password != req.ConfirmPassword)
             return BadRequest(new { message = "Passwords do not match." });
 
-        if (await db.Users.AnyAsync(u => u.Email == req.Email))
+        var normalizedEmail = req.Email.Trim().ToLower();
+        if (await db.Users.AnyAsync(u => u.Email == normalizedEmail))
             return Conflict(new { message = "An account with that email already exists." });
 
         // Generate unique username: FirstLast (first letter uppercase, rest lowercase, letters only)
@@ -201,6 +202,49 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         return Ok(new LoginResponse(jwtToken, verifyToken.User.Username, verifyToken.User.Role.ToString(), allowed));
     }
 
+    // POST /api/auth/resend-verification — allows an unverified user to request a new link
+    [HttpPost("resend-verification")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationRequest req)
+    {
+        var email = req.Email?.Trim().ToLower();
+        if (string.IsNullOrWhiteSpace(email))
+            return BadRequest(new { message = "Email is required." });
+
+        // Always return 200 to avoid leaking whether an email exists
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email && !u.EmailVerified);
+        if (user is null) return Ok(new { message = "If that email has a pending account, a new verification link has been sent." });
+
+        // Invalidate old tokens
+        var oldTokens = await db.EmailVerificationTokens
+            .Where(t => t.UserId == user.Id && !t.Used)
+            .ToListAsync();
+        foreach (var t in oldTokens) t.Used = true;
+
+        var tokenStr = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+        db.EmailVerificationTokens.Add(new EmailVerificationToken
+        {
+            Token = tokenStr,
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddHours(24)
+        });
+        await db.SaveChangesAsync();
+
+        var frontendUrl = config["App:NextFrontendUrl"] ?? "https://oneaccord.southmoorebc.org";
+        var verifyLink = $"{frontendUrl}/verify-email?token={tokenStr}";
+        try
+        {
+            await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ResendVerification] Failed to send email to {user.Email}: {ex.Message}");
+            return StatusCode(500, new { message = $"Could not send verification email: {ex.Message}" });
+        }
+
+        return Ok(new { message = "If that email has a pending account, a new verification link has been sent." });
+    }
+
     [HttpPatch("birthdate")]
     [Authorize]
     public async Task<IActionResult> UpdateBirthDate([FromBody] UpdateBirthDateRequest req)
@@ -240,3 +284,5 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         return Ok(new { message = "Password updated successfully." });
     }
 }
+
+public record ResendVerificationRequest(string? Email);
