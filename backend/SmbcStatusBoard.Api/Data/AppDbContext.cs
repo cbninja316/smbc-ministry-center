@@ -24,6 +24,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<BudgetTypeOrder> BudgetTypeOrders => Set<BudgetTypeOrder>();
     public DbSet<Debt> Debts => Set<Debt>();
     public DbSet<DebtPayment> DebtPayments => Set<DebtPayment>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -177,5 +178,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(e => e.DebtId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<AppSetting>()
+            .HasKey(s => s.Key);
     }
 }

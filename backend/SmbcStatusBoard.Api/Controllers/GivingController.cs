@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 using SmbcStatusBoard.Api.Data;
 using SmbcStatusBoard.Api.Models;
 
@@ -228,6 +229,34 @@ public class GivingController(AppDbContext db) : ControllerBase
         });
     }
 
+    // POST /api/giving/payment-intent — create a Stripe PaymentIntent
+    [HttpPost("payment-intent")]
+    public async Task<IActionResult> CreatePaymentIntent([FromBody] PaymentIntentRequest req)
+    {
+        if (req.Amount <= 0)
+            return BadRequest(new { message = "Amount must be greater than zero." });
+
+        var secretKeySetting = await db.AppSettings.FindAsync("Stripe:SecretKey");
+        if (string.IsNullOrEmpty(secretKeySetting?.Value))
+            return BadRequest(new { message = "Stripe is not configured." });
+
+        var client = new StripeClient(secretKeySetting.Value);
+        var service = new PaymentIntentService(client);
+        var intent = await service.CreateAsync(new PaymentIntentCreateOptions
+        {
+            Amount = (long)Math.Round(req.Amount * 100),
+            Currency = "usd",
+            AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true },
+            Metadata = new Dictionary<string, string>
+            {
+                ["budgetCategoryId"] = req.BudgetCategoryId?.ToString() ?? "",
+                ["notes"] = req.Notes ?? "",
+            }
+        });
+
+        return Ok(new { clientSecret = intent.ClientSecret });
+    }
+
     // GET /api/giving/my — authenticated user's giving history
     [HttpGet("my")]
     public async Task<IActionResult> GetMyGiving()
@@ -253,6 +282,7 @@ public class GivingController(AppDbContext db) : ControllerBase
     }
 }
 
-public record GiveRequest(decimal Amount, int? BudgetCategoryId, string? CategoryName, DateTime? Date, string? Notes);
+public record PaymentIntentRequest(decimal Amount, int? BudgetCategoryId, string? Notes);
+public record GiveRequest(decimal Amount, int? BudgetCategoryId, string? CategoryName, DateTime? Date, string? Notes, string? StripePaymentIntentId);
 public record DonateCheckRequest(decimal Amount, int? GivingCategoryId, DateTime? Date, string? Notes);
 public record SalaryDonateSettingsRequest(bool Enabled, decimal Percentage, int? GivingCategoryId);
