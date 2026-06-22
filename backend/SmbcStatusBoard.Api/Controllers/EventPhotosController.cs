@@ -15,11 +15,12 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
     private static readonly string[] AllowedImageTypes =
         ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"];
 
-    /// <summary>Returns all event-photo groups (events that have at least 1 photo).</summary>
+    /// <summary>Returns all event-photo groups (events with at least 1 non-hero photo).</summary>
     [HttpGet]
     public async Task<IActionResult> GetGroups()
     {
         var groups = await db.EventPhotos
+            .Where(p => !p.IsHeroImage)
             .GroupBy(p => p.ItemId)
             .Select(g => new
             {
@@ -65,12 +66,12 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
         return Ok(events);
     }
 
-    /// <summary>Returns individual photo records for one event.</summary>
+    /// <summary>Returns individual non-hero photo records for one event.</summary>
     [HttpGet("{itemId}/photos")]
     public async Task<IActionResult> GetPhotos(int itemId)
     {
         var photos = await db.EventPhotos
-            .Where(p => p.ItemId == itemId)
+            .Where(p => p.ItemId == itemId && !p.IsHeroImage)
             .OrderBy(p => p.UploadedAt)
             .Select(p => new { p.Id, p.ItemId, p.FileName, p.UploadedAt })
             .ToListAsync();
@@ -78,7 +79,7 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
         return Ok(photos);
     }
 
-    /// <summary>Uploads one or more photos and attaches them to an event.</summary>
+    /// <summary>Uploads one or more non-hero photos and attaches them to an event.</summary>
     [HttpPost("{itemId}/photos")]
     public async Task<IActionResult> Upload(int itemId, [FromForm] IFormFileCollection photos)
     {
@@ -95,7 +96,7 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
             if (photo.Length == 0) continue;
 
             if (!AllowedImageTypes.Contains(photo.ContentType.ToLower()))
-                continue; // skip non-image files silently
+                continue;
 
             using var stream = photo.OpenReadStream();
             var fileName = await storage.SaveEventPhotoAsync(itemId, stream, photo.FileName);
@@ -110,7 +111,7 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
         return Ok(saved);
     }
 
-    /// <summary>Deletes a single photo record and its file on disk.</summary>
+    /// <summary>Deletes a single non-hero photo record and its file.</summary>
     [HttpDelete("photos/{photoId}")]
     public async Task<IActionResult> DeletePhoto(int photoId)
     {
@@ -124,7 +125,7 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
         return NoContent();
     }
 
-    /// <summary>Serves the image file — AllowAnonymous so img tags work without JS auth headers.</summary>
+    /// <summary>Serves a non-hero image file.</summary>
     [HttpGet("{itemId}/photos/{photoId}/image")]
     [AllowAnonymous]
     public async Task<IActionResult> GetImage(int itemId, int photoId)
@@ -136,6 +137,95 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
         {
             var stream      = storage.GetEventPhotoStream(itemId, photo.FileName);
             var contentType = storage.GetContentType(photo.FileName);
+            return File(stream, contentType);
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    // ── Hero Image endpoints ─────────────────────────────────────────────────
+
+    /// <summary>Returns the hero image record for an event, or 404 if none.</summary>
+    [HttpGet("{itemId}/hero")]
+    public async Task<IActionResult> GetHero(int itemId)
+    {
+        var hero = await db.EventPhotos
+            .Where(p => p.ItemId == itemId && p.IsHeroImage)
+            .Select(p => new { p.Id, p.ItemId, p.FileName, p.UploadedAt })
+            .FirstOrDefaultAsync();
+
+        if (hero is null) return NotFound();
+        return Ok(hero);
+    }
+
+    /// <summary>Uploads a hero image, replacing any existing one.</summary>
+    [HttpPost("{itemId}/hero")]
+    public async Task<IActionResult> UploadHero(int itemId, [FromForm] IFormFile photo)
+    {
+        var item = await db.Items.FindAsync(itemId);
+        if (item is null) return NotFound(new { message = "Event not found." });
+
+        if (photo is null || photo.Length == 0)
+            return BadRequest(new { message = "No photo provided." });
+
+        if (!AllowedImageTypes.Contains(photo.ContentType.ToLower()))
+            return BadRequest(new { message = "Unsupported image type." });
+
+        // Delete existing hero if any
+        var existing = await db.EventPhotos
+            .Where(p => p.ItemId == itemId && p.IsHeroImage)
+            .ToListAsync();
+
+        foreach (var old in existing)
+        {
+            storage.DeleteEventPhoto(itemId, old.FileName);
+            db.EventPhotos.Remove(old);
+        }
+
+        using var stream = photo.OpenReadStream();
+        var fileName = await storage.SaveEventPhotoAsync(itemId, stream, photo.FileName);
+
+        var ep = new EventPhoto { ItemId = itemId, FileName = fileName, IsHeroImage = true };
+        db.EventPhotos.Add(ep);
+        await db.SaveChangesAsync();
+
+        return Ok(new { ep.Id, ep.ItemId, ep.FileName, ep.UploadedAt });
+    }
+
+    /// <summary>Deletes the hero image for an event.</summary>
+    [HttpDelete("{itemId}/hero")]
+    public async Task<IActionResult> DeleteHero(int itemId)
+    {
+        var hero = await db.EventPhotos
+            .Where(p => p.ItemId == itemId && p.IsHeroImage)
+            .FirstOrDefaultAsync();
+
+        if (hero is null) return NotFound();
+
+        storage.DeleteEventPhoto(itemId, hero.FileName);
+        db.EventPhotos.Remove(hero);
+        await db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    /// <summary>Serves the hero image — AllowAnonymous so img tags work without JS auth headers.</summary>
+    [HttpGet("{itemId}/hero/image")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetHeroImage(int itemId)
+    {
+        var hero = await db.EventPhotos
+            .Where(p => p.ItemId == itemId && p.IsHeroImage)
+            .FirstOrDefaultAsync();
+
+        if (hero is null) return NotFound();
+
+        try
+        {
+            var stream      = storage.GetEventPhotoStream(itemId, hero.FileName);
+            var contentType = storage.GetContentType(hero.FileName);
             return File(stream, contentType);
         }
         catch (FileNotFoundException)

@@ -7,4 +7,5 @@ public class EventPhoto
     public Item Item { get; set; } = null!;
     public string FileName { get; set; } = string.Empty;
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+    public bool IsHeroImage { get; set; } = false;
 }
