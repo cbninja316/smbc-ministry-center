@@ -25,6 +25,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Debt> Debts => Set<Debt>();
     public DbSet<DebtPayment> DebtPayments => Set<DebtPayment>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<Class> Classes => Set<Class>();
+    public DbSet<ClassMember> ClassMembers => Set<ClassMember>();
+    public DbSet<Child> Children => Set<Child>();
+    public DbSet<ClassChild> ClassChildren => Set<ClassChild>();
+    public DbSet<ClassAttendance> ClassAttendances => Set<ClassAttendance>();
+    public DbSet<ChildAttendance> ChildAttendances => Set<ChildAttendance>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -181,5 +187,67 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<AppSetting>()
             .HasKey(s => s.Key);
+
+        modelBuilder.Entity<Class>()
+            .HasOne(c => c.PromotionClass)
+            .WithMany()
+            .HasForeignKey(c => c.PromotionClassId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ClassMember>()
+            .HasOne(m => m.Class)
+            .WithMany(c => c.Members)
+            .HasForeignKey(m => m.ClassId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClassMember>()
+            .HasOne(m => m.User)
+            .WithMany()
+            .HasForeignKey(m => m.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClassChild>()
+            .HasOne(cc => cc.Class)
+            .WithMany(c => c.ClassChildren)
+            .HasForeignKey(cc => cc.ClassId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClassChild>()
+            .HasOne(cc => cc.Child)
+            .WithMany(c => c.ClassChildren)
+            .HasForeignKey(cc => cc.ChildId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClassAttendance>()
+            .HasOne(a => a.Class)
+            .WithMany(c => c.Attendance)
+            .HasForeignKey(a => a.ClassId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClassAttendance>()
+            .HasOne(a => a.User)
+            .WithMany()
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClassAttendance>()
+            .HasIndex(a => new { a.ClassId, a.UserId, a.SessionDate })
+            .IsUnique();
+
+        modelBuilder.Entity<ChildAttendance>()
+            .HasOne(a => a.Class)
+            .WithMany(c => c.ChildAttendance)
+            .HasForeignKey(a => a.ClassId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ChildAttendance>()
+            .HasOne(a => a.Child)
+            .WithMany()
+            .HasForeignKey(a => a.ChildId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ChildAttendance>()
+            .HasIndex(a => new { a.ClassId, a.ChildId, a.SessionDate })
+            .IsUnique();
     }
 }
