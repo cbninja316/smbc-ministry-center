@@ -50,6 +50,18 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
         return Ok(items);
     }
 
+    // Any authenticated user can see home-page events regardless of AllowedItemTypes
+    [HttpGet("home-events")]
+    public async Task<IActionResult> GetHomeEvents()
+    {
+        var items = await db.Items
+            .Where(i => i.Type == ItemType.ChurchEvent && i.Status != ItemStatus.ToDo)
+            .OrderBy(i => i.EventDate)
+            .ToListAsync();
+
+        return Ok(items);
+    }
+
     [HttpGet("summary")]
     public async Task<IActionResult> GetSummary()
     {
