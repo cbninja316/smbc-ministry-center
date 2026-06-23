@@ -28,6 +28,9 @@ public class ChurchEventData
     public bool PromoteFacebookEvent { get; set; }
     public bool PromoteText { get; set; }
     public bool PromoteEmail { get; set; }
+    public bool ShowOnHomePage { get; set; }
+    public string? HomeLinkName { get; set; }
+    public string? HomeLinkUrl { get; set; }
 }
 
 public class BenevolenceData
