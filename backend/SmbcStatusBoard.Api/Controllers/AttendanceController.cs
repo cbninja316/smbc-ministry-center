@@ -180,7 +180,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
     // ── Attendance report data (for print) ───────────────────────────────────
 
     [HttpGet("{classId}/report")]
-    public async Task<IActionResult> GetReport(int classId, [FromQuery] string period, [FromQuery] int? year, [FromQuery] int? month)
+    public async Task<IActionResult> GetReport(int classId, [FromQuery] string period, [FromQuery] int? year, [FromQuery] int? month, [FromQuery] string? date)
     {
         if (!CanAttendance()) return Forbid();
 
@@ -190,7 +190,10 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             .FirstOrDefaultAsync(c => c.Id == classId);
         if (cls == null) return NotFound();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Use client-supplied date for "day" to avoid UTC vs local-time mismatch
+        var today = (date != null && DateOnly.TryParse(date, out var parsedDate))
+            ? parsedDate
+            : DateOnly.FromDateTime(DateTime.UtcNow);
         DateOnly from = period switch
         {
             "day" => today,
