@@ -91,7 +91,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             });
             await db.SaveChangesAsync();
         }
-        return Ok();
+        return NoContent();
     }
 
     [HttpDelete("{classId}/sessions/{date}/users/{userId}")]
@@ -107,7 +107,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             db.ClassAttendances.Remove(record);
             await db.SaveChangesAsync();
         }
-        return Ok();
+        return NoContent();
     }
 
     // ── Mark / unmark child attendance ───────────────────────────────────────
@@ -130,7 +130,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             });
             await db.SaveChangesAsync();
         }
-        return Ok();
+        return NoContent();
     }
 
     [HttpDelete("{classId}/sessions/{date}/children/{childId}")]
@@ -146,7 +146,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             db.ChildAttendances.Remove(record);
             await db.SaveChangesAsync();
         }
-        return Ok();
+        return NoContent();
     }
 
     // ── Self-mark attendance (home page button, member marking themselves) ────
@@ -174,7 +174,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             });
             await db.SaveChangesAsync();
         }
-        return Ok();
+        return NoContent();
     }
 
     // ── Attendance report data (for print) ───────────────────────────────────

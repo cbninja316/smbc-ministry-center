@@ -246,7 +246,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
 
         db.ClassChildren.Add(new ClassChild { ClassId = id, ChildId = req.ChildId });
         await db.SaveChangesAsync();
-        return Ok();
+        return NoContent();
     }
 
     [HttpDelete("{id}/children/{childId}")]
