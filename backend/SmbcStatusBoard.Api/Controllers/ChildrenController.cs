@@ -38,7 +38,7 @@ public class ChildrenController(AppDbContext db) : ControllerBase
         };
         db.Children.Add(child);
         await db.SaveChangesAsync();
-        return Ok(child);
+        return Ok(new { child.Id, child.FirstName, child.LastName, child.CreatedAt });
     }
 
     [HttpDelete("{id}")]
