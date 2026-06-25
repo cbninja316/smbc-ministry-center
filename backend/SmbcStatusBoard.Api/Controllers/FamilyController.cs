@@ -172,11 +172,11 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         db.Children.Add(child);
         await db.SaveChangesAsync();
 
-        // Check for name collisions with existing children (excluding the one just created)
+        // Check for exact full-name collisions with existing children (excluding the one just created)
         var matches = await db.Children
-            .Where(c => c.Id != child.Id && (
-                c.FirstName.ToLower() == firstName.ToLower() ||
-                c.LastName.ToLower() == lastName.ToLower()))
+            .Where(c => c.Id != child.Id &&
+                c.FirstName.ToLower() == firstName.ToLower() &&
+                c.LastName.ToLower() == lastName.ToLower())
             .ToListAsync();
 
         foreach (var match in matches)
@@ -241,7 +241,12 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         return Ok(suggestions.Select(s => new
         {
             s.Id,
-            requestingUser = new { s.RequestingUser.Id, s.RequestingUser.FirstName, s.RequestingUser.LastName },
+            requestingUser = new {
+                s.RequestingUser.Id,
+                s.RequestingUser.FirstName,
+                s.RequestingUser.LastName,
+                s.RequestingUser.Username,
+            },
             newChild = new { s.NewChild.Id, s.NewChild.FirstName, s.NewChild.LastName },
             suggestedChild = new { s.SuggestedChild.Id, s.SuggestedChild.FirstName, s.SuggestedChild.LastName },
             s.CreatedAt,
