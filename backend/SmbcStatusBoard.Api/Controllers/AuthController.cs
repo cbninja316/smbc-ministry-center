@@ -39,6 +39,21 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         invite.User.IsActive = true;
         invite.Used = true;
 
+        // If someone linked this user as their spouse, set the reverse link too
+        if (invite.User.SpouseUserId.HasValue)
+        {
+            var linker = await db.Users.FindAsync(invite.User.SpouseUserId.Value);
+            if (linker != null && linker.SpouseUserId == null)
+                linker.SpouseUserId = invite.User.Id;
+        }
+        else
+        {
+            // Check if anyone set this user as their spouse (the other direction)
+            var linker = await db.Users.FirstOrDefaultAsync(u => u.SpouseUserId == invite.User.Id);
+            if (linker != null)
+                invite.User.SpouseUserId = linker.Id;
+        }
+
         await db.SaveChangesAsync();
 
         var token = tokenService.Generate(invite.User);

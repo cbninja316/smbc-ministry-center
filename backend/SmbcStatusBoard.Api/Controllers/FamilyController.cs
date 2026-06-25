@@ -67,9 +67,13 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
             me.SpouseUserId = existing.Id;
             await db.SaveChangesAsync();
 
-            // Active user — just link, no email needed
+            // Active user — link both directions, no email needed
             if (existing.IsActive)
+            {
+                existing.SpouseUserId = uid;
+                await db.SaveChangesAsync();
                 return Ok(new { existing.Id, existing.FirstName, existing.LastName, existing.Email, invited = false });
+            }
 
             // Inactive (previously invited but never activated) — expire old tokens and resend
             var oldTokens = await db.InviteTokens.Where(t => t.UserId == existing.Id && !t.Used).ToListAsync();
@@ -144,8 +148,11 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
     public async Task<IActionResult> RemoveSpouse()
     {
         var uid = CurrentUserId();
-        var me = await db.Users.FindAsync(uid);
+        var me = await db.Users.Include(u => u.Spouse).FirstOrDefaultAsync(u => u.Id == uid);
         if (me == null) return NotFound();
+        // Clear both directions
+        if (me.Spouse != null && me.Spouse.SpouseUserId == uid)
+            me.Spouse.SpouseUserId = null;
         me.SpouseUserId = null;
         await db.SaveChangesAsync();
         return NoContent();
