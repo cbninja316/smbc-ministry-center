@@ -11,7 +11,7 @@ using SmbcStatusBoard.Api.Data;
 namespace SmbcStatusBoard.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260625232913_AddChildLinkedUser")]
+    [Migration("20260625233720_AddChildLinkedUser")]
     partial class AddChildLinkedUser
     {
         /// <inheritdoc />
@@ -1070,7 +1070,8 @@ namespace SmbcStatusBoard.Api.Data.Migrations
                 {
                     b.HasOne("SmbcStatusBoard.Api.Models.User", "LinkedUser")
                         .WithMany()
-                        .HasForeignKey("LinkedUserId");
+                        .HasForeignKey("LinkedUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("SmbcStatusBoard.Api.Models.User", "ParentUser")
                         .WithMany("Children")

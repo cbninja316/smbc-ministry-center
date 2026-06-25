@@ -219,10 +219,15 @@ namespace SmbcStatusBoard.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("LinkedUserId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("ParentUserId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LinkedUserId");
 
                     b.HasIndex("ParentUserId");
 
@@ -1060,10 +1065,17 @@ namespace SmbcStatusBoard.Api.Data.Migrations
 
             modelBuilder.Entity("SmbcStatusBoard.Api.Models.Child", b =>
                 {
+                    b.HasOne("SmbcStatusBoard.Api.Models.User", "LinkedUser")
+                        .WithMany()
+                        .HasForeignKey("LinkedUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SmbcStatusBoard.Api.Models.User", "ParentUser")
                         .WithMany("Children")
                         .HasForeignKey("ParentUserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("LinkedUser");
 
                     b.Navigation("ParentUser");
                 });

@@ -26,7 +26,8 @@ namespace SmbcStatusBoard.Api.Data.Migrations
                 table: "Children",
                 column: "LinkedUserId",
                 principalTable: "Users",
-                principalColumn: "Id");
+                principalColumn: "Id",
+                onDelete: ReferentialAction.SetNull);
         }
 
         /// <inheritdoc />

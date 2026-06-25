@@ -265,6 +265,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(c => c.ParentUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        modelBuilder.Entity<Child>()
+            .HasOne(c => c.LinkedUser)
+            .WithMany()
+            .HasForeignKey(c => c.LinkedUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<ChildLinkSuggestion>()
             .HasOne(s => s.RequestingUser)
             .WithMany()
