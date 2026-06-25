@@ -452,7 +452,92 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         await db.SaveChangesAsync();
         return NoContent();
     }
+    // ── Admin: Create Full Family ────────────────────────────────────────────────
+
+    [HttpPost("admin/create-family")]
+    public async Task<IActionResult> AdminCreateFamily([FromBody] CreateFamilyRequest req)
+    {
+        if (!CanManagePeople()) return Forbid();
+        if (string.IsNullOrWhiteSpace(req.Primary.FirstName) || string.IsNullOrWhiteSpace(req.Primary.LastName) || string.IsNullOrWhiteSpace(req.Primary.Email))
+            return BadRequest(new { message = "Primary member: first name, last name, and email are required." });
+        if (req.Spouse != null && (string.IsNullOrWhiteSpace(req.Spouse.FirstName) || string.IsNullOrWhiteSpace(req.Spouse.LastName) || string.IsNullOrWhiteSpace(req.Spouse.Email)))
+            return BadRequest(new { message = "Spouse: first name, last name, and email are required." });
+        if (await db.Users.AnyAsync(u => u.Email == req.Primary.Email.Trim().ToLower()))
+            return Conflict(new { message = $"A user with email {req.Primary.Email} already exists." });
+        if (req.Spouse != null && await db.Users.AnyAsync(u => u.Email == req.Spouse.Email.Trim().ToLower()))
+            return Conflict(new { message = $"A user with email {req.Spouse.Email} already exists." });
+
+        static string Cap(string s) { var l = new string(s.Where(char.IsLetter).ToArray()); return l.Length == 0 ? "" : char.ToUpper(l[0]) + l[1..].ToLower(); }
+        async Task<string> UniqueUsername(string first, string last) {
+            var b = Cap(first) + Cap(last);
+            var u = b; var n = 1;
+            while (await db.Users.AnyAsync(x => x.Username == u)) u = b + n++;
+            return u;
+        }
+
+        var siteUrl = config["App:NextFrontendUrl"]?.Trim() ?? config["App:FrontendUrl"]?.Split(',')[0].Trim() ?? "";
+
+        async Task<User> CreateAndInvite(NewMemberPayload p) {
+            var user = new User {
+                FirstName = p.FirstName.Trim(),
+                LastName = p.LastName.Trim(),
+                Username = await UniqueUsername(p.FirstName, p.LastName),
+                Email = p.Email.Trim().ToLower(),
+                Role = UserRole.Member,
+                AllowedItemTypes = "",
+                IsActive = false,
+                BirthDate = string.IsNullOrWhiteSpace(p.BirthDate) ? null : DateOnly.Parse(p.BirthDate),
+                MembershipStatus = Enum.TryParse<MembershipStatus>(p.MembershipStatus, out var ms) ? ms : MembershipStatus.NotAMember,
+                JoinedBy = Enum.TryParse<JoinedBy>(p.JoinedBy, out var jb) ? jb : null,
+                MembershipDate = string.IsNullOrWhiteSpace(p.MembershipDate) ? null : DateOnly.Parse(p.MembershipDate),
+                HasLeft = p.HasLeft,
+                IsDeceased = p.IsDeceased,
+            };
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+
+            var token = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+            db.InviteTokens.Add(new InviteToken { Token = token, UserId = user.Id, ExpiresAt = DateTime.UtcNow.AddHours(48) });
+            await db.SaveChangesAsync();
+
+            var link = $"{siteUrl}/setup-password?token={token}";
+            try { await email.SendInviteAsync(user.Email, user.Username, link); } catch { /* don't fail if email fails */ }
+
+            return user;
+        }
+
+        var primary = await CreateAndInvite(req.Primary);
+
+        User? spouse = null;
+        if (req.Spouse != null) {
+            spouse = await CreateAndInvite(req.Spouse);
+            primary.SpouseUserId = spouse.Id;
+            spouse.SpouseUserId = primary.Id;
+            await db.SaveChangesAsync();
+        }
+
+        foreach (var c in req.Children ?? []) {
+            var child = new Child {
+                FirstName = c.FirstName.Trim(),
+                LastName = c.LastName.Trim(),
+                BirthDate = string.IsNullOrWhiteSpace(c.BirthDate) ? null : DateOnly.Parse(c.BirthDate),
+                ParentUserId = primary.Id,
+            };
+            db.Children.Add(child);
+        }
+        await db.SaveChangesAsync();
+
+        return Ok(new { message = "Family created.", primaryId = primary.Id, spouseId = spouse?.Id });
+    }
 }
 
+public record NewMemberPayload(
+    string FirstName, string LastName, string Email,
+    string? BirthDate,
+    string? MembershipStatus, string? JoinedBy, string? MembershipDate,
+    bool HasLeft, bool IsDeceased
+);
+public record NewChildPayload(string FirstName, string LastName, string? BirthDate);
+public record CreateFamilyRequest(NewMemberPayload Primary, NewMemberPayload? Spouse, List<NewChildPayload>? Children);
 public record SpouseRequest(string FirstName, string LastName, string Email);
 public record FamilyChildRequest(string FirstName, string LastName, string? BirthDate);
