@@ -177,7 +177,13 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         var firstName = req.FirstName.Trim();
         var lastName = req.LastName.Trim();
 
-        var child = new Child { FirstName = firstName, LastName = lastName, ParentUserId = uid };
+        var child = new Child
+        {
+            FirstName = firstName,
+            LastName = lastName,
+            ParentUserId = uid,
+            BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : null,
+        };
         db.Children.Add(child);
         await db.SaveChangesAsync();
 
@@ -309,4 +315,4 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
 }
 
 public record SpouseRequest(string FirstName, string LastName, string Email);
-public record FamilyChildRequest(string FirstName, string LastName);
+public record FamilyChildRequest(string FirstName, string LastName, string? BirthDate);

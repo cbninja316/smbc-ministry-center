@@ -36,10 +36,11 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
         {
             FirstName = req.FirstName.Trim(),
             LastName = req.LastName.Trim(),
+            BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : null,
         };
         db.Children.Add(child);
         await db.SaveChangesAsync();
-        return Ok(new { child.Id, child.FirstName, child.LastName, child.CreatedAt });
+        return Ok(new { child.Id, child.FirstName, child.LastName, child.BirthDate, child.CreatedAt });
     }
 
     [HttpPost("{id}/promote-to-member")]
@@ -109,5 +110,5 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
     }
 }
 
-public record ChildPayload(string FirstName, string LastName);
+public record ChildPayload(string FirstName, string LastName, string? BirthDate);
 public record PromoteChildRequest(string Email);
