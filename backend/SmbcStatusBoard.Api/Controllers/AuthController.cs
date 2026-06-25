@@ -308,7 +308,7 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         var uid = int.Parse(User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)!);
         var user = await db.Users.FindAsync(uid);
         if (user == null) return NotFound();
-        return Ok(new { user.Id, user.FirstName, user.LastName, user.Username, user.Email });
+        return Ok(new { user.Id, user.FirstName, user.LastName, user.Username, user.Email, BirthDate = user.BirthDate?.ToString("yyyy-MM-dd") });
     }
 }
 

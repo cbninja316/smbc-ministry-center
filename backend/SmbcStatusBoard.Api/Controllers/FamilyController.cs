@@ -45,12 +45,14 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                     ? string.Join(" ", System.Text.RegularExpressions.Regex.Replace(user.Spouse.Username, "([a-z])([A-Z])", "$1 $2").Split(' ').Skip(1))
                     : user.Spouse.LastName,
                 user.Spouse.Email,
+                BirthDate = user.Spouse.BirthDate?.ToString("yyyy-MM-dd"),
             },
             children = allChildren.Select(c => new
             {
                 c.Id,
                 c.FirstName,
                 c.LastName,
+                BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"),
                 inAnyClass = c.ClassChildren.Any(cc => !cc.IsRemoved),
             }),
         });
