@@ -262,6 +262,106 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         return NoContent();
     }
 
+    // ── Admin: all family groups ──────────────────────────────────────────────
+
+    private bool CanManagePeople()
+    {
+        if (IsSuperAdmin()) return true;
+        var allowed = User.FindFirstValue("AllowedItemTypes") ?? "";
+        return allowed.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Contains("People", StringComparer.OrdinalIgnoreCase);
+    }
+
+    [HttpGet("all")]
+    public async Task<IActionResult> GetAllFamilies()
+    {
+        if (!CanManagePeople()) return Forbid();
+
+        // Load all active users with spouse + children
+        var users = await db.Users
+            .Include(u => u.Children)
+            .Include(u => u.Spouse)
+            .OrderBy(u => u.LastName).ThenBy(u => u.FirstName)
+            .ToListAsync();
+
+        // Build family groups — primary user is whoever has the lower Id when spouses exist
+        var visited = new HashSet<int>();
+        var groups = new List<object>();
+
+        foreach (var u in users)
+        {
+            if (visited.Contains(u.Id)) continue;
+            visited.Add(u.Id);
+
+            User? spouse = null;
+            if (u.SpouseUserId.HasValue)
+            {
+                spouse = users.FirstOrDefault(s => s.Id == u.SpouseUserId.Value);
+                if (spouse != null) visited.Add(spouse.Id);
+            }
+
+            // Combine children from both spouses, deduplicated
+            var allChildren = u.Children
+                .Concat(spouse?.Children ?? Enumerable.Empty<Child>())
+                .DistinctBy(c => c.Id)
+                .OrderBy(c => c.LastName).ThenBy(c => c.FirstName)
+                .Select(c => new { c.Id, c.FirstName, c.LastName, BirthDate = c.BirthDate?.ToString("yyyy-MM-dd") })
+                .ToList<object>();
+
+            groups.Add(new
+            {
+                primaryUser = MapUser(u),
+                spouse = spouse == null ? null : MapUser(spouse),
+                children = allChildren,
+            });
+        }
+
+        return Ok(groups);
+    }
+
+    private static object MapUser(User u) => new
+    {
+        u.Id,
+        u.FirstName,
+        u.LastName,
+        u.Username,
+        u.Email,
+        u.IsActive,
+        BirthDate = u.BirthDate?.ToString("yyyy-MM-dd"),
+        MembershipStatus = u.MembershipStatus.ToString(),
+        JoinedBy = u.JoinedBy?.ToString(),
+        MembershipDate = u.MembershipDate?.ToString("yyyy-MM-dd"),
+        u.HasLeft,
+        u.IsDeceased,
+    };
+
+    [HttpDelete("admin/{userId}/children/{childId}")]
+    public async Task<IActionResult> AdminRemoveChildFromFamily(int userId, int childId)
+    {
+        if (!CanManagePeople()) return Forbid();
+        var child = await db.Children.FirstOrDefaultAsync(c => c.Id == childId && c.ParentUserId == userId);
+        if (child == null) return NotFound();
+        child.ParentUserId = null;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("admin/{userId}/spouse")]
+    public async Task<IActionResult> AdminRemoveSpouse(int userId)
+    {
+        if (!CanManagePeople()) return Forbid();
+        var user = await db.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+        if (user.SpouseUserId.HasValue)
+        {
+            var spouse = await db.Users.FindAsync(user.SpouseUserId.Value);
+            if (spouse != null) spouse.SpouseUserId = null;
+            user.SpouseUserId = null;
+        }
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // ── Unclassed children (for banners on classes/attendance pages) ──────────
 
     [HttpGet("unclassed-children")]

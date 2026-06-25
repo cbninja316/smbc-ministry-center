@@ -159,6 +159,27 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         return Ok(new { message = "User verified and activated." });
     }
 
+    [HttpPut("{id}/profile")]
+    public async Task<IActionResult> UpdateProfile(int id, [FromBody] UpdateProfileRequest req)
+    {
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(req.FirstName)) user.FirstName = req.FirstName.Trim();
+        if (!string.IsNullOrWhiteSpace(req.LastName)) user.LastName = req.LastName.Trim();
+        if (!string.IsNullOrWhiteSpace(req.Email))
+        {
+            var normalEmail = req.Email.Trim().ToLower();
+            if (normalEmail != user.Email && await db.Users.AnyAsync(u => u.Email == normalEmail && u.Id != id))
+                return Conflict(new { message = "A user with that email already exists." });
+            user.Email = normalEmail;
+        }
+        user.BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : user.BirthDate;
+
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Profile updated." });
+    }
+
     [HttpPut("{id}/membership")]
     public async Task<IActionResult> UpdateMembership(int id, [FromBody] UpdateMembershipRequest req)
     {

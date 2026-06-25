@@ -43,6 +43,19 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
         return Ok(new { child.Id, child.FirstName, child.LastName, child.BirthDate, child.CreatedAt });
     }
 
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] ChildPayload req)
+    {
+        if (!CanManageClasses()) return Forbid();
+        var child = await db.Children.FindAsync(id);
+        if (child == null) return NotFound();
+        child.FirstName = req.FirstName.Trim();
+        child.LastName = req.LastName.Trim();
+        child.BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : null;
+        await db.SaveChangesAsync();
+        return Ok(new { child.Id, child.FirstName, child.LastName, child.BirthDate });
+    }
+
     [HttpPost("{id}/promote-to-member")]
     public async Task<IActionResult> PromoteToMember(int id, [FromBody] PromoteChildRequest req)
     {
