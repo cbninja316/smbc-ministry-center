@@ -16,7 +16,9 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest req)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == req.Username && u.IsActive);
+        var identifier = req.Username.Trim();
+        var user = await db.Users.FirstOrDefaultAsync(u =>
+            (u.Username == identifier || u.Email == identifier.ToLower()) && u.IsActive);
         if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid credentials." });
 
