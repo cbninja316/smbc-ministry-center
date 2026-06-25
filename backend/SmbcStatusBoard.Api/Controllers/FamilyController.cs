@@ -38,8 +38,12 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
             spouse = user.Spouse == null ? null : new
             {
                 user.Spouse.Id,
-                user.Spouse.FirstName,
-                user.Spouse.LastName,
+                FirstName = string.IsNullOrWhiteSpace(user.Spouse.FirstName)
+                    ? System.Text.RegularExpressions.Regex.Replace(user.Spouse.Username, "([a-z])([A-Z])", "$1 $2").Split(' ')[0]
+                    : user.Spouse.FirstName,
+                LastName = string.IsNullOrWhiteSpace(user.Spouse.LastName)
+                    ? string.Join(" ", System.Text.RegularExpressions.Regex.Replace(user.Spouse.Username, "([a-z])([A-Z])", "$1 $2").Split(' ').Skip(1))
+                    : user.Spouse.LastName,
                 user.Spouse.Email,
             },
             children = allChildren.Select(c => new
