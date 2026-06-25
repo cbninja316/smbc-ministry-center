@@ -177,6 +177,53 @@ public class AttendanceController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    // ── Today's family attendance (home page load) ───────────────────────────
+
+    [HttpGet("family/today")]
+    public async Task<IActionResult> GetFamilyToday()
+    {
+        var uid = CurrentUserId();
+        var me = await db.Users.FindAsync(uid);
+        if (me == null) return NotFound();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // Collect family member IDs
+        var userIds = new List<int> { uid };
+        if (me.SpouseUserId.HasValue) userIds.Add(me.SpouseUserId.Value);
+
+        var familyChildren = await db.Children
+            .Where(c => c.ParentUserId.HasValue && userIds.Contains(c.ParentUserId.Value))
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        // Load today's user attendance
+        var userAttendance = await db.ClassAttendances
+            .Where(a => a.SessionDate == today && userIds.Contains(a.UserId))
+            .Select(a => new { a.ClassId, a.UserId })
+            .ToListAsync();
+
+        // Load today's child attendance
+        var childAttendance = await db.ChildAttendances
+            .Where(a => a.SessionDate == today && familyChildren.Contains(a.ChildId))
+            .Select(a => new { a.ClassId, a.ChildId })
+            .ToListAsync();
+
+        // Return as flat list of keys matching frontend format: "classId:self", "classId:spouse", "classId:child:childId"
+        var spouseId = me.SpouseUserId;
+        var keys = new List<string>();
+
+        foreach (var a in userAttendance)
+        {
+            if (a.UserId == uid) keys.Add($"{a.ClassId}:self");
+            else if (spouseId.HasValue && a.UserId == spouseId.Value) keys.Add($"{a.ClassId}:spouse");
+        }
+        foreach (var a in childAttendance)
+            keys.Add($"{a.ClassId}:child:{a.ChildId}");
+
+        return Ok(keys);
+    }
+
     // ── Self-mark child attendance (home page) ───────────────────────────────
 
     [HttpPost("{classId}/self-child/{childId}")]
