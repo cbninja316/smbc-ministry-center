@@ -128,6 +128,13 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
         if (!IsSuperAdmin()) return Forbid();
         var child = await db.Children.FindAsync(id);
         if (child == null) return NotFound();
+
+        // Remove any link suggestions referencing this child before deleting
+        var suggestions = await db.ChildLinkSuggestions
+            .Where(s => s.NewChildId == id || s.SuggestedChildId == id)
+            .ToListAsync();
+        db.ChildLinkSuggestions.RemoveRange(suggestions);
+
         db.Children.Remove(child);
         await db.SaveChangesAsync();
         return NoContent();
