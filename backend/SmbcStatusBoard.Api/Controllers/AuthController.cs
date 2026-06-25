@@ -298,6 +298,16 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
 
         return Ok(new { message = "Password updated successfully." });
     }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> GetMe()
+    {
+        var uid = int.Parse(User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)!);
+        var user = await db.Users.FindAsync(uid);
+        if (user == null) return NotFound();
+        return Ok(new { user.Id, user.FirstName, user.LastName, user.Username, user.Email });
+    }
 }
 
 public record ResendVerificationRequest(string? Email);

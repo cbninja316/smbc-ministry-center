@@ -48,6 +48,61 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         return Ok(memberships.Select(m => MapClass(m.Class)));
     }
 
+    [HttpGet("family")]
+    public async Task<IActionResult> GetFamily()
+    {
+        var uid = CurrentUserId();
+        var me = await db.Users.FindAsync(uid);
+        if (me == null) return NotFound();
+
+        // Collect all family member IDs (user + spouse) and child IDs
+        var userIds = new List<int> { uid };
+        if (me.SpouseUserId.HasValue) userIds.Add(me.SpouseUserId.Value);
+
+        var childParentIds = new List<int>(userIds);
+        var familyChildIds = await db.Children
+            .Where(c => c.ParentUserId.HasValue && childParentIds.Contains(c.ParentUserId.Value))
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        // Find all class IDs any family member is enrolled in
+        var classIdsFromMembers = await db.ClassMembers
+            .Where(m => userIds.Contains(m.UserId!.Value) && m.Status == "Active" && !m.IsRemoved)
+            .Select(m => m.ClassId)
+            .Distinct()
+            .ToListAsync();
+
+        var classIdsFromChildren = await db.ClassChildren
+            .Where(cc => familyChildIds.Contains(cc.ChildId) && !cc.IsRemoved)
+            .Select(cc => cc.ClassId)
+            .Distinct()
+            .ToListAsync();
+
+        var allClassIds = classIdsFromMembers.Union(classIdsFromChildren).Distinct().ToList();
+
+        var classes = await db.Classes
+            .Where(c => allClassIds.Contains(c.Id))
+            .Include(c => c.Members).ThenInclude(m => m.User)
+            .Include(c => c.ClassChildren).ThenInclude(cc => cc.Child)
+            .Include(c => c.PromotionClass)
+            .ToListAsync();
+
+        // For each class, annotate which family members are in it
+        var spouseId = me.SpouseUserId;
+        var result = classes.Select(c => new
+        {
+            Class = MapClass(c),
+            SelfInClass = c.Members.Any(m => m.UserId == uid && m.Status == "Active" && !m.IsRemoved),
+            SpouseInClass = spouseId.HasValue && c.Members.Any(m => m.UserId == spouseId.Value && m.Status == "Active" && !m.IsRemoved),
+            ChildrenInClass = c.ClassChildren
+                .Where(cc => !cc.IsRemoved && familyChildIds.Contains(cc.ChildId))
+                .Select(cc => new { cc.ChildId, cc.Child.FirstName, cc.Child.LastName })
+                .ToList(),
+        });
+
+        return Ok(result);
+    }
+
     // ── Create ───────────────────────────────────────────────────────────────
 
     [HttpPost]
