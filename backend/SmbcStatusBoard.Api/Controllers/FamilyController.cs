@@ -4,13 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmbcStatusBoard.Api.Data;
 using SmbcStatusBoard.Api.Models;
+using SmbcStatusBoard.Api.Services;
 
 namespace SmbcStatusBoard.Api.Controllers;
 
 [ApiController]
 [Route("api/family")]
 [Authorize]
-public class FamilyController(AppDbContext db) : ControllerBase
+public class FamilyController(AppDbContext db, EmailService email, IConfiguration config) : ControllerBase
 {
     private int CurrentUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private bool IsSuperAdmin() => User.IsInRole("SuperAdmin");
@@ -55,21 +56,57 @@ public class FamilyController(AppDbContext db) : ControllerBase
         var me = await db.Users.FindAsync(uid);
         if (me == null) return NotFound();
 
-        // Find matching user by email
         var normalEmail = req.Email.Trim().ToLower();
-        var match = await db.Users.FirstOrDefaultAsync(u =>
-            u.Email == normalEmail &&
-            u.FirstName.ToLower() == req.FirstName.Trim().ToLower() &&
-            u.LastName.ToLower() == req.LastName.Trim().ToLower() &&
-            u.Id != uid);
+        var firstName = req.FirstName.Trim();
+        var lastName = req.LastName.Trim();
 
-        if (match == null)
-            return BadRequest("No member found with that name and email. The spouse must already have an account.");
+        // If an active member with that email already exists, link directly
+        var existing = await db.Users.FirstOrDefaultAsync(u => u.Email == normalEmail && u.Id != uid);
+        if (existing != null)
+        {
+            me.SpouseUserId = existing.Id;
+            await db.SaveChangesAsync();
+            return Ok(new { existing.Id, existing.FirstName, existing.LastName, existing.Email, invited = false });
+        }
 
-        me.SpouseUserId = match.Id;
+        // No account found — create inactive user and send invite
+        var baseUsername = (firstName + lastName).Replace(" ", "");
+        var username = baseUsername;
+        var suffix = 1;
+        while (await db.Users.AnyAsync(u => u.Username == username))
+            username = baseUsername + suffix++;
+
+        var newUser = new User
+        {
+            FirstName = firstName,
+            LastName = lastName,
+            Email = normalEmail,
+            Username = username,
+            Role = UserRole.Member,
+            IsActive = false,
+            EmailVerified = false,
+            AllowedItemTypes = string.Empty,
+        };
+        db.Users.Add(newUser);
         await db.SaveChangesAsync();
 
-        return Ok(new { match.Id, match.FirstName, match.LastName, match.Email });
+        var token = Guid.NewGuid().ToString("N");
+        db.InviteTokens.Add(new InviteToken
+        {
+            UserId = newUser.Id,
+            Token = token,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+        });
+
+        me.SpouseUserId = newUser.Id;
+        await db.SaveChangesAsync();
+
+        var frontendUrl = config["App:FrontendUrl"]?.Split(',')[0].Trim() ?? "";
+        var joinLink = $"{frontendUrl}/setup-password?token={token}";
+        var myName = $"{me.FirstName} {me.LastName}".Trim();
+        try { await email.SendSpouseInviteAsync(normalEmail, firstName, myName, joinLink); } catch { }
+
+        return Ok(new { newUser.Id, newUser.FirstName, newUser.LastName, newUser.Email, invited = true });
     }
 
     [HttpDelete("spouse")]
