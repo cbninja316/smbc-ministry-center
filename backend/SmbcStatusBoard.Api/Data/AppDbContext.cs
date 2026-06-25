@@ -31,6 +31,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ClassChild> ClassChildren => Set<ClassChild>();
     public DbSet<ClassAttendance> ClassAttendances => Set<ClassAttendance>();
     public DbSet<ChildAttendance> ChildAttendances => Set<ChildAttendance>();
+    public DbSet<ChildLinkSuggestion> ChildLinkSuggestions => Set<ChildLinkSuggestion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -249,5 +250,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<ChildAttendance>()
             .HasIndex(a => new { a.ClassId, a.ChildId, a.SessionDate })
             .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Spouse)
+            .WithMany()
+            .HasForeignKey(u => u.SpouseUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Child>()
+            .HasOne(c => c.ParentUser)
+            .WithMany(u => u.Children)
+            .HasForeignKey(c => c.ParentUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ChildLinkSuggestion>()
+            .HasOne(s => s.RequestingUser)
+            .WithMany()
+            .HasForeignKey(s => s.RequestingUserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ChildLinkSuggestion>()
+            .HasOne(s => s.NewChild)
+            .WithMany()
+            .HasForeignKey(s => s.NewChildId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ChildLinkSuggestion>()
+            .HasOne(s => s.SuggestedChild)
+            .WithMany()
+            .HasForeignKey(s => s.SuggestedChildId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -25,6 +25,11 @@ public class User
 
     public string? PreferencesJson { get; set; }
 
+    // Family
+    public int? SpouseUserId { get; set; }
+    public User? Spouse { get; set; }
+
+    public ICollection<Child> Children { get; set; } = new List<Child>();
     public ICollection<InviteToken> InviteTokens { get; set; } = new List<InviteToken>();
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
     public ICollection<EmailVerificationToken> EmailVerificationTokens { get; set; } = new List<EmailVerificationToken>();
