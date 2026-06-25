@@ -316,9 +316,9 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
                         ? $"{item.EventDate.Value:MMM d, yyyy} – {item.EventEndDate.Value:MMM d, yyyy}"
                         : item.EventDate.Value.ToString("MMM d, yyyy");
                     if (!string.IsNullOrWhiteSpace(details?.StartTime))
-                        dateRange += $" · {details.StartTime}";
+                        dateRange += $" · {FormatTime12Hr(details.StartTime)}";
                     if (!string.IsNullOrWhiteSpace(details?.EndTime))
-                        dateRange += $" – {details.EndTime}";
+                        dateRange += $" – {FormatTime12Hr(details.EndTime)}";
                 }
 
                 await email.SendEventRegistrationAsync(
@@ -452,5 +452,17 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
         }
 
         await db.SaveChangesAsync();
+    }
+
+    private static string FormatTime12Hr(string? time)
+    {
+        if (string.IsNullOrWhiteSpace(time)) return time ?? "";
+        if (TimeSpan.TryParse(time, out var ts))
+        {
+            var hour = ts.Hours % 12 == 0 ? 12 : ts.Hours % 12;
+            var suffix = ts.Hours < 12 ? "AM" : "PM";
+            return ts.Minutes == 0 ? $"{hour} {suffix}" : $"{hour}:{ts.Minutes:D2} {suffix}";
+        }
+        return time;
     }
 }
