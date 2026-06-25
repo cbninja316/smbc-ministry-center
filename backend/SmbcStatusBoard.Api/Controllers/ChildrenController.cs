@@ -79,14 +79,24 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
         while (await db.Users.AnyAsync(u => u.Username == username))
             username = baseUsername + suffix++;
 
+        var role = req.Role?.ToLower() switch
+        {
+            "superadmin" => UserRole.SuperAdmin,
+            "admin" => UserRole.Admin,
+            _ => UserRole.Member
+        };
+        var allowedTypes = (role == UserRole.SuperAdmin || role == UserRole.Member)
+            ? ""
+            : string.Join(",", req.AllowedItemTypes ?? []);
+
         var user = new User
         {
             FirstName = child.FirstName,
             LastName = child.LastName,
             Username = username,
             Email = email,
-            Role = UserRole.Member,
-            AllowedItemTypes = "",
+            Role = role,
+            AllowedItemTypes = allowedTypes,
             IsActive = false
         };
 
@@ -101,7 +111,8 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
             ExpiresAt = DateTime.UtcNow.AddHours(48)
         });
 
-        db.Children.Remove(child);
+        // Keep the child record so they remain in the family group; link to the new user account
+        child.LinkedUserId = user.Id;
         await db.SaveChangesAsync();
 
         var siteUrl = config["App:NextFrontendUrl"] ?? config["App:SiteUrl"] ?? config["App:FrontendUrl"];
@@ -124,4 +135,4 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
 }
 
 public record ChildPayload(string FirstName, string LastName, string? BirthDate);
-public record PromoteChildRequest(string Email);
+public record PromoteChildRequest(string Email, string? Role = null, List<string>? AllowedItemTypes = null);

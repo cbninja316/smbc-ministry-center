@@ -279,8 +279,14 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
     {
         if (!CanManagePeople()) return Forbid();
 
-        // Load all active users with spouse + children
+        // Load all active users with spouse + children; exclude users who are linked children (they appear under their parent family)
+        var linkedUserIds = await db.Children
+            .Where(c => c.LinkedUserId.HasValue)
+            .Select(c => c.LinkedUserId!.Value)
+            .ToListAsync();
+
         var users = await db.Users
+            .Where(u => !linkedUserIds.Contains(u.Id))
             .Include(u => u.Children)
             .Include(u => u.Spouse)
             .OrderBy(u => u.LastName).ThenBy(u => u.FirstName)
@@ -307,7 +313,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 .Concat(spouse?.Children ?? Enumerable.Empty<Child>())
                 .DistinctBy(c => c.Id)
                 .OrderBy(c => c.LastName).ThenBy(c => c.FirstName)
-                .Select(c => new { c.Id, c.FirstName, c.LastName, BirthDate = c.BirthDate?.ToString("yyyy-MM-dd") })
+                .Select(c => new { c.Id, c.FirstName, c.LastName, BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"), c.LinkedUserId })
                 .ToList<object>();
 
             groups.Add(new

@@ -11,5 +11,8 @@ public class Child
     public int? ParentUserId { get; set; }
     public User? ParentUser { get; set; }
 
+    public int? LinkedUserId { get; set; }
+    public User? LinkedUser { get; set; }
+
     public ICollection<ClassChild> ClassChildren { get; set; } = [];
 }
