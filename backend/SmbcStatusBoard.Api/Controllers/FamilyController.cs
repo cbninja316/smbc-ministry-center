@@ -176,25 +176,63 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
 
         var firstName = req.FirstName.Trim();
         var lastName = req.LastName.Trim();
+        var birthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : (DateOnly?)null;
 
+        // Check for an exact first + last + birthdate match among existing children
+        var exactMatch = birthDate.HasValue
+            ? await db.Children.FirstOrDefaultAsync(c =>
+                c.FirstName.ToLower() == firstName.ToLower() &&
+                c.LastName.ToLower() == lastName.ToLower() &&
+                c.BirthDate == birthDate)
+            : null;
+
+        if (exactMatch != null)
+        {
+            // Link the existing child to this parent instead of creating a duplicate
+            exactMatch.ParentUserId = uid;
+
+            // Alert the admin dashboard via a suggestion so they are aware of the link
+            var alreadySuggested = await db.ChildLinkSuggestions
+                .AnyAsync(s => s.RequestingUserId == uid && s.SuggestedChildId == exactMatch.Id);
+            if (!alreadySuggested)
+            {
+                // Use the existing child as both the "new" and "suggested" child so the admin
+                // sees the link event. We create a minimal placeholder child to satisfy the FK.
+                var placeholder = new Child { FirstName = firstName, LastName = lastName, BirthDate = birthDate };
+                db.Children.Add(placeholder);
+                await db.SaveChangesAsync();
+
+                db.ChildLinkSuggestions.Add(new ChildLinkSuggestion
+                {
+                    RequestingUserId = uid,
+                    NewChildId = placeholder.Id,
+                    SuggestedChildId = exactMatch.Id,
+                });
+            }
+
+            await db.SaveChangesAsync();
+            return Ok(new { exactMatch.Id, exactMatch.FirstName, exactMatch.LastName, hasSuggestions = true });
+        }
+
+        // No exact match — create a new child record
         var child = new Child
         {
             FirstName = firstName,
             LastName = lastName,
             ParentUserId = uid,
-            BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : null,
+            BirthDate = birthDate,
         };
         db.Children.Add(child);
         await db.SaveChangesAsync();
 
-        // Check for exact full-name collisions with existing children (excluding the one just created)
-        var matches = await db.Children
+        // Check for name-only collisions (existing records may lack birthdates) and suggest
+        var nameMatches = await db.Children
             .Where(c => c.Id != child.Id &&
                 c.FirstName.ToLower() == firstName.ToLower() &&
                 c.LastName.ToLower() == lastName.ToLower())
             .ToListAsync();
 
-        foreach (var match in matches)
+        foreach (var match in nameMatches)
         {
             var alreadySuggested = await db.ChildLinkSuggestions
                 .AnyAsync(s => s.RequestingUserId == uid && s.NewChildId == child.Id && s.SuggestedChildId == match.Id);
@@ -208,9 +246,9 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 });
             }
         }
-        if (matches.Count > 0) await db.SaveChangesAsync();
+        if (nameMatches.Count > 0) await db.SaveChangesAsync();
 
-        return Ok(new { child.Id, child.FirstName, child.LastName, hasSuggestions = matches.Count > 0 });
+        return Ok(new { child.Id, child.FirstName, child.LastName, hasSuggestions = nameMatches.Count > 0 });
     }
 
     [HttpDelete("children/{childId}")]
@@ -269,8 +307,8 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 s.RequestingUser.LastName,
                 s.RequestingUser.Username,
             },
-            newChild = new { s.NewChild.Id, s.NewChild.FirstName, s.NewChild.LastName },
-            suggestedChild = new { s.SuggestedChild.Id, s.SuggestedChild.FirstName, s.SuggestedChild.LastName },
+            newChild = new { s.NewChild.Id, s.NewChild.FirstName, s.NewChild.LastName, s.NewChild.BirthDate },
+            suggestedChild = new { s.SuggestedChild.Id, s.SuggestedChild.FirstName, s.SuggestedChild.LastName, s.SuggestedChild.BirthDate },
             s.CreatedAt,
         }));
     }
