@@ -1,6 +1,8 @@
 namespace SmbcStatusBoard.Api.Models;
 
 public enum UserRole { Member, Admin, SuperAdmin }
+public enum MembershipStatus { NotAMember, Member }
+public enum JoinedBy { TransferByLetter, AcceptedChrist, StatementOfFaith }
 
 public class User
 {
@@ -17,6 +19,13 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateOnly? BirthDate { get; set; }
+
+    // Church membership
+    public MembershipStatus MembershipStatus { get; set; } = MembershipStatus.NotAMember;
+    public JoinedBy? JoinedBy { get; set; }
+    public DateOnly? MembershipDate { get; set; }
+    public bool HasLeft { get; set; } = false;
+    public bool IsDeceased { get; set; } = false;
 
     public bool SalaryDonateEnabled { get; set; } = false;
     public decimal SalaryDonatePercentage { get; set; } = 0;

@@ -29,11 +29,18 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         {
             u.Id,
             u.Username,
+            u.FirstName,
+            u.LastName,
             u.Email,
             Role = u.Role.ToString(),
             u.IsActive,
             AllowedItemTypes = u.AllowedItemTypes.Split(',', StringSplitOptions.RemoveEmptyEntries),
-            u.CreatedAt
+            u.CreatedAt,
+            MembershipStatus = u.MembershipStatus.ToString(),
+            JoinedBy = u.JoinedBy == null ? (string?)null : u.JoinedBy.ToString(),
+            u.MembershipDate,
+            u.HasLeft,
+            u.IsDeceased
         }).ToListAsync();
 
         return Ok(users);
@@ -150,6 +157,27 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
 
         await db.SaveChangesAsync();
         return Ok(new { message = "User verified and activated." });
+    }
+
+    [HttpPut("{id}/membership")]
+    public async Task<IActionResult> UpdateMembership(int id, [FromBody] UpdateMembershipRequest req)
+    {
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        if (!Enum.TryParse<Models.MembershipStatus>(req.MembershipStatus, true, out var status))
+            return BadRequest(new { message = "Invalid membership status." });
+
+        user.MembershipStatus = status;
+        user.JoinedBy = null;
+        if (req.JoinedBy is not null && Enum.TryParse<Models.JoinedBy>(req.JoinedBy, true, out var joinedBy))
+            user.JoinedBy = joinedBy;
+        user.MembershipDate = req.MembershipDate.HasValue ? DateOnly.FromDateTime(req.MembershipDate.Value) : null;
+        user.HasLeft = req.HasLeft;
+        user.IsDeceased = req.IsDeceased;
+
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Membership updated." });
     }
 
     [HttpDelete("{id}")]
