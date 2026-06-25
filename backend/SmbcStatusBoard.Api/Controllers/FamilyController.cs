@@ -60,13 +60,33 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         var firstName = req.FirstName.Trim();
         var lastName = req.LastName.Trim();
 
-        // If an active member with that email already exists, link directly
+        // If a member with that email already exists...
         var existing = await db.Users.FirstOrDefaultAsync(u => u.Email == normalEmail && u.Id != uid);
         if (existing != null)
         {
             me.SpouseUserId = existing.Id;
             await db.SaveChangesAsync();
-            return Ok(new { existing.Id, existing.FirstName, existing.LastName, existing.Email, invited = false });
+
+            // Active user — just link, no email needed
+            if (existing.IsActive)
+                return Ok(new { existing.Id, existing.FirstName, existing.LastName, existing.Email, invited = false });
+
+            // Inactive (previously invited but never activated) — expire old tokens and resend
+            var oldTokens = await db.InviteTokens.Where(t => t.UserId == existing.Id && !t.Used).ToListAsync();
+            foreach (var t in oldTokens) t.Used = true;
+
+            var newToken = Guid.NewGuid().ToString("N");
+            db.InviteTokens.Add(new InviteToken { UserId = existing.Id, Token = newToken, ExpiresAt = DateTime.UtcNow.AddDays(7) });
+            await db.SaveChangesAsync();
+
+            var frontendUrlExisting = config["App:NextFrontendUrl"]?.Trim()
+                ?? config["App:FrontendUrl"]?.Split(',')[0].Trim() ?? "";
+            var joinLinkExisting = $"{frontendUrlExisting}/setup-password?token={newToken}";
+            var myNameExisting = $"{me.FirstName} {me.LastName}".Trim();
+            if (string.IsNullOrEmpty(myNameExisting)) myNameExisting = me.Username;
+            try { await email.SendSpouseInviteAsync(existing.Email, existing.FirstName, myNameExisting, existing.Username, joinLinkExisting); } catch { }
+
+            return Ok(new { existing.Id, existing.FirstName, existing.LastName, existing.Email, invited = true });
         }
 
         // No account found — create inactive user and send invite
