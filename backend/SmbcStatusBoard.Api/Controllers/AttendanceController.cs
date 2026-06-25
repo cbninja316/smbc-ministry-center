@@ -177,6 +177,111 @@ public class AttendanceController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    // ── Self-mark child attendance (home page) ───────────────────────────────
+
+    [HttpPost("{classId}/self-child/{childId}")]
+    public async Task<IActionResult> MarkSelfChild(int classId, int childId)
+    {
+        var uid = CurrentUserId();
+        var me = await db.Users.FindAsync(uid);
+        if (me == null) return NotFound();
+
+        // Child must belong to user or their spouse
+        var spouseId = me.SpouseUserId;
+        var child = await db.Children.FirstOrDefaultAsync(c =>
+            c.Id == childId && (c.ParentUserId == uid || (spouseId.HasValue && c.ParentUserId == spouseId.Value)));
+        if (child == null) return Forbid();
+
+        // Child must be in the class
+        var inClass = await db.ClassChildren.AnyAsync(cc => cc.ClassId == classId && cc.ChildId == childId && !cc.IsRemoved);
+        if (!inClass) return Forbid();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var exists = await db.ChildAttendances.AnyAsync(a =>
+            a.ClassId == classId && a.ChildId == childId && a.SessionDate == today);
+        if (!exists)
+        {
+            db.ChildAttendances.Add(new ChildAttendance { ClassId = classId, ChildId = childId, SessionDate = today });
+            await db.SaveChangesAsync();
+        }
+        return NoContent();
+    }
+
+    // ── Self-mark spouse attendance (home page) ───────────────────────────────
+
+    [HttpPost("{classId}/self-spouse")]
+    public async Task<IActionResult> MarkSelfSpouse(int classId)
+    {
+        var uid = CurrentUserId();
+        var me = await db.Users.FindAsync(uid);
+        if (me == null || !me.SpouseUserId.HasValue) return Forbid();
+
+        var spouseId = me.SpouseUserId.Value;
+        var member = await db.ClassMembers.FirstOrDefaultAsync(m =>
+            m.ClassId == classId && m.UserId == spouseId && m.Status == "Active" && !m.IsRemoved);
+        if (member == null) return Forbid();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var exists = await db.ClassAttendances.AnyAsync(a =>
+            a.ClassId == classId && a.UserId == spouseId && a.SessionDate == today);
+        if (!exists)
+        {
+            db.ClassAttendances.Add(new ClassAttendance { ClassId = classId, UserId = spouseId, SessionDate = today });
+            await db.SaveChangesAsync();
+        }
+        return NoContent();
+    }
+
+    // ── Self-mark everyone (user + spouse + children) ─────────────────────────
+
+    [HttpPost("{classId}/self-family")]
+    public async Task<IActionResult> MarkSelfFamily(int classId)
+    {
+        var uid = CurrentUserId();
+        var me = await db.Users.FindAsync(uid);
+        if (me == null) return NotFound();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // Mark self
+        var selfMember = await db.ClassMembers.FirstOrDefaultAsync(m =>
+            m.ClassId == classId && m.UserId == uid && m.Status == "Active" && !m.IsRemoved);
+        if (selfMember != null && !await db.ClassAttendances.AnyAsync(a => a.ClassId == classId && a.UserId == uid && a.SessionDate == today))
+            db.ClassAttendances.Add(new ClassAttendance { ClassId = classId, UserId = uid, SessionDate = today });
+
+        // Mark spouse
+        if (me.SpouseUserId.HasValue)
+        {
+            var spId = me.SpouseUserId.Value;
+            var spMember = await db.ClassMembers.FirstOrDefaultAsync(m =>
+                m.ClassId == classId && m.UserId == spId && m.Status == "Active" && !m.IsRemoved);
+            if (spMember != null && !await db.ClassAttendances.AnyAsync(a => a.ClassId == classId && a.UserId == spId && a.SessionDate == today))
+                db.ClassAttendances.Add(new ClassAttendance { ClassId = classId, UserId = spId, SessionDate = today });
+        }
+
+        // Mark children (own + spouse's)
+        var parentIds = new List<int> { uid };
+        if (me.SpouseUserId.HasValue) parentIds.Add(me.SpouseUserId.Value);
+
+        var classChildren = await db.ClassChildren
+            .Where(cc => cc.ClassId == classId && !cc.IsRemoved)
+            .Select(cc => cc.ChildId)
+            .ToListAsync();
+
+        var familyChildren = await db.Children
+            .Where(c => c.ParentUserId.HasValue && parentIds.Contains(c.ParentUserId.Value) && classChildren.Contains(c.Id))
+            .ToListAsync();
+
+        foreach (var child in familyChildren)
+        {
+            if (!await db.ChildAttendances.AnyAsync(a => a.ClassId == classId && a.ChildId == child.Id && a.SessionDate == today))
+                db.ChildAttendances.Add(new ChildAttendance { ClassId = classId, ChildId = child.Id, SessionDate = today });
+        }
+
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // ── Attendance report data (for print) ───────────────────────────────────
 
     [HttpGet("{classId}/report")]
