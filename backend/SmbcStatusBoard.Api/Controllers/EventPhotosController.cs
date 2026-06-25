@@ -15,36 +15,37 @@ public class EventPhotosController(AppDbContext db, FileStorageService storage) 
     private static readonly string[] AllowedImageTypes =
         ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"];
 
-    /// <summary>Returns all event-photo groups (events with at least 1 non-hero photo).</summary>
+    /// <summary>Returns all event-photo groups (events with at least 1 photo or hero).</summary>
     [HttpGet]
     public async Task<IActionResult> GetGroups()
     {
-        var groups = await db.EventPhotos
-            .Where(p => !p.IsHeroImage)
+        var allPhotos = await db.EventPhotos
             .GroupBy(p => p.ItemId)
             .Select(g => new
             {
-                ItemId    = g.Key,
-                PhotoCount = g.Count(),
-                Latest    = g.Max(p => p.UploadedAt)
+                ItemId     = g.Key,
+                PhotoCount = g.Count(p => !p.IsHeroImage),
+                HasHero    = g.Any(p => p.IsHeroImage),
+                Latest     = g.Max(p => p.UploadedAt)
             })
             .ToListAsync();
 
-        var itemIds = groups.Select(g => g.ItemId).ToList();
+        var itemIds = allPhotos.Select(g => g.ItemId).ToList();
         var items   = await db.Items
             .Where(i => itemIds.Contains(i.Id))
             .ToListAsync();
 
-        var result = groups
+        var result = allPhotos
             .Select(g =>
             {
                 var item = items.FirstOrDefault(i => i.Id == g.ItemId);
                 return new
                 {
-                    itemId     = g.ItemId,
-                    eventName  = item?.Name ?? "Unknown Event",
-                    eventDate  = item?.EventDate,
-                    photoCount = g.PhotoCount,
+                    itemId       = g.ItemId,
+                    eventName    = item?.Name ?? "Unknown Event",
+                    eventDate    = item?.EventDate,
+                    photoCount   = g.PhotoCount,
+                    hasHero      = g.HasHero,
                     latestUpload = g.Latest
                 };
             })
