@@ -11,4 +11,5 @@ public class SpecialEvent
     public DateTime? EndDate { get; set; }
     public RecurrenceType Recurrence { get; set; } = RecurrenceType.None;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public List<SpecialEventTimeSlot> TimeSlots { get; set; } = [];
 }
