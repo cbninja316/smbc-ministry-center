@@ -245,6 +245,143 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
         await email.SendItemCompletedAsync(item.Email!, item.RequestedBy, typeLabel, details, note);
     }
 
+    // POST /api/items/{id}/register
+    [HttpPost("{id}/register")]
+    [Authorize]
+    public async Task<IActionResult> Register(int id, [FromBody] EventRegisterRequest req)
+    {
+        var item = await db.Items.FindAsync(id);
+        if (item == null) return NotFound();
+
+        var uid = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var me = await db.Users.Include(u => u.Children).Include(u => u.Spouse).ThenInclude(s => s!.Children)
+            .FirstOrDefaultAsync(u => u.Id == uid);
+        if (me == null) return NotFound();
+
+        var familyUserIds = new HashSet<int> { uid };
+        if (me.SpouseUserId.HasValue) familyUserIds.Add(me.SpouseUserId.Value);
+
+        var familyChildIds = me.Children.Select(c => c.Id)
+            .Concat(me.Spouse?.Children.Select(c => c.Id) ?? [])
+            .ToHashSet();
+
+        foreach (var userId in req.UserIds ?? [])
+        {
+            if (!familyUserIds.Contains(userId)) return Forbid();
+            var already = await db.EventRegistrations.AnyAsync(r => r.ItemId == id && r.UserId == userId);
+            if (!already) db.EventRegistrations.Add(new EventRegistration { ItemId = id, UserId = userId });
+        }
+
+        foreach (var childId in req.ChildIds ?? [])
+        {
+            if (!familyChildIds.Contains(childId)) return Forbid();
+            var already = await db.EventRegistrations.AnyAsync(r => r.ItemId == id && r.ChildId == childId);
+            if (!already) db.EventRegistrations.Add(new EventRegistration { ItemId = id, ChildId = childId });
+        }
+
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Registered." });
+    }
+
+    // DELETE /api/items/{id}/register
+    [HttpDelete("{id}/register")]
+    [Authorize]
+    public async Task<IActionResult> Unregister(int id, [FromBody] EventRegisterRequest req)
+    {
+        var uid = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var me = await db.Users.Include(u => u.Children).Include(u => u.Spouse).ThenInclude(s => s!.Children)
+            .FirstOrDefaultAsync(u => u.Id == uid);
+        if (me == null) return NotFound();
+
+        var familyUserIds = new HashSet<int> { uid };
+        if (me.SpouseUserId.HasValue) familyUserIds.Add(me.SpouseUserId.Value);
+        var familyChildIds = me.Children.Select(c => c.Id)
+            .Concat(me.Spouse?.Children.Select(c => c.Id) ?? [])
+            .ToHashSet();
+
+        foreach (var userId in req.UserIds ?? [])
+        {
+            if (!familyUserIds.Contains(userId)) continue;
+            var reg = await db.EventRegistrations.FirstOrDefaultAsync(r => r.ItemId == id && r.UserId == userId);
+            if (reg != null) db.EventRegistrations.Remove(reg);
+        }
+        foreach (var childId in req.ChildIds ?? [])
+        {
+            if (!familyChildIds.Contains(childId)) continue;
+            var reg = await db.EventRegistrations.FirstOrDefaultAsync(r => r.ItemId == id && r.ChildId == childId);
+            if (reg != null) db.EventRegistrations.Remove(reg);
+        }
+
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    // GET /api/items/{id}/registrations (admin)
+    [HttpGet("{id}/registrations")]
+    [Authorize(Roles = "Admin,SuperAdmin")]
+    public async Task<IActionResult> GetRegistrations(int id)
+    {
+        var regs = await db.EventRegistrations
+            .Where(r => r.ItemId == id)
+            .Include(r => r.User)
+            .Include(r => r.Child)
+            .OrderBy(r => r.RegisteredAt)
+            .ToListAsync();
+
+        return Ok(regs.Select(r => r.UserId.HasValue
+            ? new {
+                type = "user",
+                id = r.UserId.Value,
+                firstName = r.User!.FirstName,
+                lastName = r.User.LastName,
+                username = r.User.Username,
+                email = r.User.Email,
+                birthDate = r.User.BirthDate?.ToString("yyyy-MM-dd"),
+                registeredAt = r.RegisteredAt,
+              }
+            : new {
+                type = "child",
+                id = r.ChildId!.Value,
+                firstName = r.Child!.FirstName,
+                lastName = r.Child.LastName,
+                username = (string?)null,
+                email = (string?)null,
+                birthDate = r.Child.BirthDate?.ToString("yyyy-MM-dd"),
+                registeredAt = r.RegisteredAt,
+              }
+        ));
+    }
+
+    // GET /api/items/{id}/my-registrations
+    [HttpGet("{id}/my-registrations")]
+    [Authorize]
+    public async Task<IActionResult> GetMyRegistrations(int id)
+    {
+        var uid = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var me = await db.Users.Include(u => u.Children).Include(u => u.Spouse).ThenInclude(s => s!.Children)
+            .FirstOrDefaultAsync(u => u.Id == uid);
+        if (me == null) return NotFound();
+
+        var familyUserIds = new HashSet<int> { uid };
+        if (me.SpouseUserId.HasValue) familyUserIds.Add(me.SpouseUserId.Value);
+        var familyChildIds = me.Children.Select(c => c.Id)
+            .Concat(me.Spouse?.Children.Select(c => c.Id) ?? [])
+            .ToHashSet();
+
+        var regs = await db.EventRegistrations
+            .Where(r => r.ItemId == id && (
+                (r.UserId.HasValue && familyUserIds.Contains(r.UserId.Value)) ||
+                (r.ChildId.HasValue && familyChildIds.Contains(r.ChildId.Value))
+            ))
+            .ToListAsync();
+
+        return Ok(new {
+            userIds = regs.Where(r => r.UserId.HasValue).Select(r => r.UserId!.Value).ToList(),
+            childIds = regs.Where(r => r.ChildId.HasValue).Select(r => r.ChildId!.Value).ToList(),
+        });
+    }
+
     private async Task AutoAdvanceStatusAsync()
     {
         var now = DateTime.UtcNow.Date;

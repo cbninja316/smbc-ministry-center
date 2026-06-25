@@ -31,6 +31,9 @@ public class ChurchEventData
     public bool ShowOnHomePage { get; set; }
     public string? HomeLinkName { get; set; }
     public string? HomeLinkUrl { get; set; }
+    public bool IsOneAccordRegistration { get; set; }
+    public int? AgeMin { get; set; }
+    public int? AgeMax { get; set; }
 }
 
 public class BenevolenceData
@@ -60,6 +63,8 @@ public class BenevolenceData
     public string? PayableTo { get; set; }
     public string? DateAssistanceProvided { get; set; }
 }
+
+public record EventRegisterRequest(int[]? UserIds, int[]? ChildIds);
 
 public record ItemStatusUpdate(ItemStatus Status, int SortOrder);
 

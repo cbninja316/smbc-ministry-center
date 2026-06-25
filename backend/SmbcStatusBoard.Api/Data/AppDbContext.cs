@@ -32,6 +32,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ClassAttendance> ClassAttendances => Set<ClassAttendance>();
     public DbSet<ChildAttendance> ChildAttendances => Set<ChildAttendance>();
     public DbSet<ChildLinkSuggestion> ChildLinkSuggestions => Set<ChildLinkSuggestion>();
+    public DbSet<EventRegistration> EventRegistrations => Set<EventRegistration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
