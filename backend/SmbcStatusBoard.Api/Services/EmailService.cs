@@ -564,4 +564,71 @@ public class EmailService(IConfiguration config)
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
+
+    public async Task SendEventRegistrationAsync(
+        List<(string Email, string Name)> recipients,
+        string eventName,
+        string? eventDateRange,
+        string? location,
+        List<string> registeredNames)
+    {
+        if (recipients.Count == 0) return;
+
+        var nameList = string.Join("", registeredNames.Select(n =>
+            $"<li style=\"padding:4px 0;color:#111827;\">{System.Net.WebUtility.HtmlEncode(n)}</li>"));
+
+        var dateRow = !string.IsNullOrWhiteSpace(eventDateRange)
+            ? $"<p style=\"margin:0 0 4px;color:#6b7280;font-size:0.9rem;\">{System.Net.WebUtility.HtmlEncode(eventDateRange)}</p>"
+            : "";
+        var locationRow = !string.IsNullOrWhiteSpace(location)
+            ? $"<p style=\"margin:0 0 0;color:#6b7280;font-size:0.9rem;\">&#128205; {System.Net.WebUtility.HtmlEncode(location)}</p>"
+            : "";
+
+        var html = $"""
+            <div style="font-family:sans-serif;max-width:560px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
+              <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+                <div style="background:#005DBA;padding:20px 28px;">
+                  <h2 style="margin:0;color:#fff;font-size:1.2rem;">You're Registered!</h2>
+                </div>
+                <div style="padding:24px 28px;">
+                  <h3 style="margin:0 0 6px;color:#111827;font-size:1.1rem;">{System.Net.WebUtility.HtmlEncode(eventName)}</h3>
+                  {dateRow}
+                  {locationRow}
+                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
+                  <p style="margin:0 0 10px;color:#374151;font-weight:600;">Registered attendees:</p>
+                  <ul style="margin:0;padding-left:20px;">
+                    {nameList}
+                  </ul>
+                  <p style="margin:20px 0 0;color:#9ca3af;font-size:0.8rem;">
+                    See you there! Log in to One Accord if you need to make changes.
+                  </p>
+                </div>
+              </div>
+            </div>
+            """;
+
+        using var client = new SmtpClient();
+        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
+        {
+            if (errors == SslPolicyErrors.None) return true;
+            if (chain == null) return false;
+            return chain.ChainStatus.All(s =>
+                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
+                s.Status == X509ChainStatusFlags.OfflineRevocation);
+        };
+        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
+        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+
+        foreach (var (email, name) in recipients)
+        {
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+            message.To.Add(new MailboxAddress(name, email));
+            message.Subject = $"Registration Confirmed: {eventName}";
+            message.Body = new TextPart("html") { Text = html };
+            await client.SendAsync(message);
+        }
+
+        await client.DisconnectAsync(true);
+    }
 }

@@ -281,6 +281,56 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
         }
 
         await db.SaveChangesAsync();
+
+        // Send confirmation email to member and spouse (if they have email)
+        try
+        {
+            var details = item.ChurchEventDetails;
+
+            // Build list of registered names for the email body
+            var registeredUsers = req.UserIds?.Length > 0
+                ? await db.Users.Where(u => req.UserIds.Contains(u.Id)).ToListAsync()
+                : [];
+            var registeredChildren = req.ChildIds?.Length > 0
+                ? await db.Children.Where(c => req.ChildIds.Contains(c.Id)).ToListAsync()
+                : [];
+
+            var registeredNames = registeredUsers.Select(u => $"{u.FirstName} {u.LastName}".Trim())
+                .Concat(registeredChildren.Select(c => $"{c.FirstName} {c.LastName}".Trim()))
+                .ToList();
+
+            if (registeredNames.Count > 0)
+            {
+                // Collect email recipients: the registering user + their spouse
+                var emailRecipients = new List<(string Email, string Name)>();
+                if (!string.IsNullOrWhiteSpace(me.Email))
+                    emailRecipients.Add((me.Email, $"{me.FirstName} {me.LastName}".Trim()));
+                if (me.Spouse != null && !string.IsNullOrWhiteSpace(me.Spouse.Email))
+                    emailRecipients.Add((me.Spouse.Email, $"{me.Spouse.FirstName} {me.Spouse.LastName}".Trim()));
+
+                // Format date range
+                string? dateRange = null;
+                if (item.EventDate.HasValue)
+                {
+                    dateRange = item.EventEndDate.HasValue && item.EventEndDate != item.EventDate
+                        ? $"{item.EventDate.Value:MMM d, yyyy} – {item.EventEndDate.Value:MMM d, yyyy}"
+                        : item.EventDate.Value.ToString("MMM d, yyyy");
+                    if (!string.IsNullOrWhiteSpace(details?.StartTime))
+                        dateRange += $" · {details.StartTime}";
+                    if (!string.IsNullOrWhiteSpace(details?.EndTime))
+                        dateRange += $" – {details.EndTime}";
+                }
+
+                await email.SendEventRegistrationAsync(
+                    emailRecipients,
+                    item.Name,
+                    dateRange,
+                    details?.Location,
+                    registeredNames);
+            }
+        }
+        catch { /* email failure should not block the registration response */ }
+
         return Ok(new { message = "Registered." });
     }
 
