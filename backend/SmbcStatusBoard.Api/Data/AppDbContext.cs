@@ -277,6 +277,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(s => s.RequestingUserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<EventRegistration>()
+            .HasOne(r => r.Child)
+            .WithMany()
+            .HasForeignKey(r => r.ChildId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<ChildLinkSuggestion>()
             .HasOne(s => s.NewChild)
             .WithMany()
