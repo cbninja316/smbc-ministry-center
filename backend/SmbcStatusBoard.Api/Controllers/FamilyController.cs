@@ -276,15 +276,17 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
             .FirstOrDefaultAsync(s => s.Id == id && !s.IsResolved);
         if (suggestion == null) return NotFound();
 
-        // Transfer the parent link from the new child to the suggested (existing) child
+        // Transfer the parent link to the existing (suggested) child
         suggestion.SuggestedChild.ParentUserId = suggestion.RequestingUserId;
-        // Remove the newly created duplicate child record
-        db.Children.Remove(suggestion.NewChild);
-        // Resolve all suggestions involving this new child
+
+        // Delete all suggestions referencing the new duplicate child first (Restrict FK requires this)
         var related = await db.ChildLinkSuggestions
             .Where(s => s.NewChildId == suggestion.NewChildId).ToListAsync();
-        foreach (var s in related) s.IsResolved = true;
+        db.ChildLinkSuggestions.RemoveRange(related);
+        await db.SaveChangesAsync();
 
+        // Now safe to delete the duplicate child record
+        db.Children.Remove(suggestion.NewChild);
         await db.SaveChangesAsync();
         return NoContent();
     }
