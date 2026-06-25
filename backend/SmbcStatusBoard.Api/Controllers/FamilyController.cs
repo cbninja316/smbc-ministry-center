@@ -23,10 +23,15 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
     {
         var uid = CurrentUserId();
         var user = await db.Users
-            .Include(u => u.Spouse)
+            .Include(u => u.Spouse).ThenInclude(s => s!.Children).ThenInclude(c => c.ClassChildren.Where(cc => !cc.IsRemoved))
             .Include(u => u.Children).ThenInclude(c => c.ClassChildren.Where(cc => !cc.IsRemoved))
             .FirstOrDefaultAsync(u => u.Id == uid);
         if (user == null) return NotFound();
+
+        // Combine own children + spouse's children, deduplicated by id
+        var allChildren = user.Children
+            .Concat(user.Spouse?.Children ?? [])
+            .DistinctBy(c => c.Id);
 
         return Ok(new
         {
@@ -37,7 +42,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 user.Spouse.LastName,
                 user.Spouse.Email,
             },
-            children = user.Children.Select(c => new
+            children = allChildren.Select(c => new
             {
                 c.Id,
                 c.FirstName,
@@ -215,8 +220,15 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
     public async Task<IActionResult> GetUnclassedChildren()
     {
         var uid = CurrentUserId();
+        var me = await db.Users.FindAsync(uid);
+        if (me == null) return NotFound();
+
+        // Include spouse's children too
+        var parentIds = new List<int> { uid };
+        if (me.SpouseUserId.HasValue) parentIds.Add(me.SpouseUserId.Value);
+
         var children = await db.Children
-            .Where(c => c.ParentUserId == uid)
+            .Where(c => c.ParentUserId.HasValue && parentIds.Contains(c.ParentUserId.Value))
             .Include(c => c.ClassChildren)
             .ToListAsync();
 
