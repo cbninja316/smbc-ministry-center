@@ -44,7 +44,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             .Select(a => a.ChildId)
             .ToListAsync();
 
-        var members = cls.Members.Select(m => new
+        var members = cls.Members.Where(m => !m.IsRemoved).Select(m => new
         {
             m.Id,
             m.UserId,
@@ -60,7 +60,7 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             Attended = m.UserId.HasValue && userAttendance.Contains(m.UserId.Value),
         });
 
-        var children = cls.ClassChildren.Select(cc => new
+        var children = cls.ClassChildren.Where(cc => !cc.IsRemoved).Select(cc => new
         {
             cc.ChildId,
             cc.Child.FirstName,

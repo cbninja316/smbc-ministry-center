@@ -7,5 +7,6 @@ public class ClassChild
     public Class Class { get; set; } = null!;
     public int ChildId { get; set; }
     public Child Child { get; set; } = null!;
+    public bool IsRemoved { get; set; } = false;
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 }

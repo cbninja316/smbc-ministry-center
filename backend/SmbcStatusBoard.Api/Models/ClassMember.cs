@@ -16,5 +16,6 @@ public class ClassMember
     public string? InviteLastName { get; set; }
 
     public string Status { get; set; } = "Active";  // Active | Pending
+    public bool IsRemoved { get; set; } = false;
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 }

@@ -42,7 +42,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
     {
         var uid = CurrentUserId();
         var memberships = await db.ClassMembers
-            .Where(m => m.UserId == uid && m.Status == "Active")
+            .Where(m => m.UserId == uid && m.Status == "Active" && !m.IsRemoved)
             .Include(m => m.Class)
             .ToListAsync();
         return Ok(memberships.Select(m => MapClass(m.Class)));
@@ -116,8 +116,15 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         var user = await db.Users.FindAsync(req.UserId);
         if (user == null) return NotFound("User not found");
 
-        var exists = await db.ClassMembers.AnyAsync(m => m.ClassId == id && m.UserId == req.UserId);
-        if (exists) return BadRequest("User is already in this class");
+        var existing = await db.ClassMembers.FirstOrDefaultAsync(m => m.ClassId == id && m.UserId == req.UserId);
+        if (existing != null && !existing.IsRemoved) return BadRequest("User is already in this class");
+        if (existing != null && existing.IsRemoved)
+        {
+            existing.IsRemoved = false;
+            existing.Status = "Active";
+            await db.SaveChangesAsync();
+            return Ok(new { existing.Id, existing.UserId, existing.Status });
+        }
 
         var member = new ClassMember { ClassId = id, UserId = req.UserId, Status = "Active" };
         db.ClassMembers.Add(member);
@@ -148,8 +155,14 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         var existing = await db.Users.FirstOrDefaultAsync(u => u.Email == normalEmail);
         if (existing != null)
         {
-            var alreadyIn = await db.ClassMembers.AnyAsync(m => m.ClassId == id && m.UserId == existing.Id);
-            if (alreadyIn) return BadRequest("User is already in this class");
+            var existingMember = await db.ClassMembers.FirstOrDefaultAsync(m => m.ClassId == id && m.UserId == existing.Id);
+            if (existingMember != null && !existingMember.IsRemoved) return BadRequest("User is already in this class");
+            if (existingMember != null && existingMember.IsRemoved)
+            {
+                existingMember.IsRemoved = false; existingMember.Status = "Active";
+                await db.SaveChangesAsync();
+                return Ok(new { message = "Member re-added to class" });
+            }
 
             db.ClassMembers.Add(new ClassMember { ClassId = id, UserId = existing.Id, Status = "Active" });
             await db.SaveChangesAsync();
@@ -161,8 +174,9 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         }
 
         // Check for duplicate pending invite
-        var dupPending = await db.ClassMembers.AnyAsync(m => m.ClassId == id && m.InviteEmail == normalEmail);
-        if (dupPending) return BadRequest("An invitation has already been sent to that email");
+        var dupPending = await db.ClassMembers.FirstOrDefaultAsync(m => m.ClassId == id && m.InviteEmail == normalEmail);
+        if (dupPending != null && !dupPending.IsRemoved) return BadRequest("An invitation has already been sent to that email");
+        if (dupPending != null && dupPending.IsRemoved) { dupPending.IsRemoved = false; await db.SaveChangesAsync(); return Ok(new { message = "Invitation re-activated" }); }
 
         // Create inactive user
         var firstName = req.FirstName.Trim();
@@ -216,14 +230,14 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         return Ok(new { message = "Invitation sent" });
     }
 
-    // Remove a member
+    // Remove a member (soft-delete)
     [HttpDelete("{id}/members/{memberId}")]
     public async Task<IActionResult> RemoveMember(int id, int memberId)
     {
         if (!CanManageClasses()) return Forbid();
         var member = await db.ClassMembers.FirstOrDefaultAsync(m => m.Id == memberId && m.ClassId == id);
         if (member == null) return NotFound();
-        db.ClassMembers.Remove(member);
+        member.IsRemoved = true;
         await db.SaveChangesAsync();
         return NoContent();
     }
@@ -241,8 +255,14 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         var child = await db.Children.FindAsync(req.ChildId);
         if (child == null) return NotFound("Child not found");
 
-        var exists = await db.ClassChildren.AnyAsync(cc => cc.ClassId == id && cc.ChildId == req.ChildId);
-        if (exists) return BadRequest("Child is already in this class");
+        var existingCc = await db.ClassChildren.FirstOrDefaultAsync(cc => cc.ClassId == id && cc.ChildId == req.ChildId);
+        if (existingCc != null && !existingCc.IsRemoved) return BadRequest("Child is already in this class");
+        if (existingCc != null && existingCc.IsRemoved)
+        {
+            existingCc.IsRemoved = false;
+            await db.SaveChangesAsync();
+            return NoContent();
+        }
 
         db.ClassChildren.Add(new ClassChild { ClassId = id, ChildId = req.ChildId });
         await db.SaveChangesAsync();
@@ -255,7 +275,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         if (!CanManageClasses()) return Forbid();
         var cc = await db.ClassChildren.FirstOrDefaultAsync(cc => cc.ClassId == id && cc.ChildId == childId);
         if (cc == null) return NotFound();
-        db.ClassChildren.Remove(cc);
+        cc.IsRemoved = true;
         await db.SaveChangesAsync();
         return NoContent();
     }
@@ -312,6 +332,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
             m.Id,
             m.UserId,
             m.Status,
+            m.IsRemoved,
             m.InviteEmail,
             m.InviteFirstName,
             m.InviteLastName,
@@ -325,6 +346,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
             cc.ChildId,
             cc.Child.FirstName,
             cc.Child.LastName,
+            cc.IsRemoved,
             cc.AddedAt,
         }) ?? [],
     };
