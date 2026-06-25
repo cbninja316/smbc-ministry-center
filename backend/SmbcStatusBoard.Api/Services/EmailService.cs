@@ -523,7 +523,7 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendSpouseInviteAsync(string toEmail, string toName, string inviterName, string joinLink)
+    public async Task SendSpouseInviteAsync(string toEmail, string toName, string inviterName, string newUsername, string joinLink)
     {
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
@@ -540,7 +540,8 @@ public class EmailService(IConfiguration config)
                     </div>
                     <div style="padding:24px 28px;">
                       <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
-                      <p style="margin:0 0 20px;color:#374151;"><strong>{System.Net.WebUtility.HtmlEncode(inviterName)}</strong> has added you as their spouse on One Accord, the South Moore Baptist Church member portal. Click below to create your account and get started.</p>
+                      <p style="margin:0 0 16px;color:#374151;"><strong>{System.Net.WebUtility.HtmlEncode(inviterName)}</strong> has added you as their spouse on One Accord, the South Moore Baptist Church member portal. Click below to set your password and get started.</p>
+                      <p style="margin:0 0 20px;color:#374151;">Your username is: <strong>{System.Net.WebUtility.HtmlEncode(newUsername)}</strong></p>
                       <a href="{joinLink}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">Create My Account</a>
                       <p style="margin:16px 0 0;color:#6b7280;font-size:0.85rem;">This link expires in 7 days. If you weren't expecting this email, you can safely ignore it.</p>
                     </div>

@@ -70,7 +70,14 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         }
 
         // No account found — create inactive user and send invite
-        var baseUsername = (firstName + lastName).Replace(" ", "");
+        // Username rule: Capitalize(first) + Capitalize(last) — letters only, first char upper, rest lower
+        static string CapWord(string s)
+        {
+            var letters = new string(s.Where(char.IsLetter).ToArray());
+            return letters.Length == 0 ? "" : char.ToUpper(letters[0]) + letters[1..].ToLower();
+        }
+        var baseUsername = CapWord(firstName) + CapWord(lastName);
+        if (string.IsNullOrEmpty(baseUsername)) baseUsername = "Member";
         var username = baseUsername;
         var suffix = 1;
         while (await db.Users.AnyAsync(u => u.Username == username))
@@ -101,10 +108,14 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         me.SpouseUserId = newUser.Id;
         await db.SaveChangesAsync();
 
-        var frontendUrl = config["App:FrontendUrl"]?.Split(',')[0].Trim() ?? "";
+        // Prefer NextFrontendUrl (single value) then first entry of FrontendUrl
+        var frontendUrl = config["App:NextFrontendUrl"]?.Trim()
+            ?? config["App:FrontendUrl"]?.Split(',')[0].Trim()
+            ?? "";
         var joinLink = $"{frontendUrl}/setup-password?token={token}";
         var myName = $"{me.FirstName} {me.LastName}".Trim();
-        try { await email.SendSpouseInviteAsync(normalEmail, firstName, myName, joinLink); } catch { }
+        if (string.IsNullOrEmpty(myName)) myName = me.Username;
+        try { await email.SendSpouseInviteAsync(normalEmail, firstName, myName, username, joinLink); } catch { }
 
         return Ok(new { newUser.Id, newUser.FirstName, newUser.LastName, newUser.Email, invited = true });
     }
