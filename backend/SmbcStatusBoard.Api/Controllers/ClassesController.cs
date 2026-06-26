@@ -285,6 +285,76 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         return Ok(new { message = "Invitation sent" });
     }
 
+    // POST /api/classes/{id}/members/prospect — add a prospect (no email required)
+    [HttpPost("{id}/members/prospect")]
+    public async Task<IActionResult> AddProspect(int id, [FromBody] AddProspectRequest req)
+    {
+        if (!CanManageClasses()) return Forbid();
+
+        var cls = await db.Classes.FindAsync(id);
+        if (cls == null) return NotFound("Class not found");
+
+        var firstName = req.FirstName.Trim();
+        var lastName = req.LastName.Trim();
+        if (string.IsNullOrEmpty(firstName) || string.IsNullOrEmpty(lastName))
+            return BadRequest(new { message = "First and last name are required." });
+
+        var baseUsername = (firstName + lastName).Replace(" ", "");
+        var username = baseUsername;
+        var suffix = 1;
+        while (await db.Users.AnyAsync(u => u.Username == username))
+            username = baseUsername + suffix++;
+
+        var membershipStatus = req.MembershipStatus?.ToLower() switch
+        {
+            "member" => Models.MembershipStatus.Member,
+            _ => Models.MembershipStatus.NotAMember,
+        };
+        var joinedBy = req.JoinedBy?.ToLower() switch
+        {
+            "transferbyletter" => (Models.JoinedBy?)Models.JoinedBy.TransferByLetter,
+            "acceptedchrist" => Models.JoinedBy.AcceptedChrist,
+            "statementoffaith" => Models.JoinedBy.StatementOfFaith,
+            _ => null,
+        };
+        DateOnly? membershipDate = null;
+        if (!string.IsNullOrEmpty(req.MembershipDate) && DateOnly.TryParse(req.MembershipDate, out var md))
+            membershipDate = md;
+
+        // Generate a placeholder email so the unique constraint is satisfied
+        var placeholderEmail = $"prospect.{username.ToLower()}@oneaccord.local";
+
+        var newUser = new User
+        {
+            FirstName = firstName,
+            LastName = lastName,
+            Email = placeholderEmail,
+            Username = username,
+            Role = UserRole.Member,
+            IsActive = false,
+            EmailVerified = false,
+            AllowedItemTypes = string.Empty,
+            MembershipStatus = membershipStatus,
+            JoinedBy = joinedBy,
+            MembershipDate = membershipDate,
+        };
+        db.Users.Add(newUser);
+        await db.SaveChangesAsync();
+
+        var member = new ClassMember
+        {
+            ClassId = id,
+            UserId = newUser.Id,
+            Status = "Active",
+            InviteFirstName = firstName,
+            InviteLastName = lastName,
+        };
+        db.ClassMembers.Add(member);
+        await db.SaveChangesAsync();
+
+        return Ok(new { message = "Prospect added.", userId = newUser.Id, username });
+    }
+
     // Remove a member (soft-delete)
     [HttpDelete("{id}/members/{memberId}")]
     public async Task<IActionResult> RemoveMember(int id, int memberId)
@@ -415,4 +485,5 @@ file static class StringExtensions
 public record ClassPayload(string Title, string Description, int DayOfWeek, string ClassTime, ClassType Type, int? PromotionClassId);
 public record AddUserRequest(int UserId);
 public record InviteNewMemberRequest(string FirstName, string LastName, string Email);
+public record AddProspectRequest(string FirstName, string LastName, string? MembershipStatus = null, string? JoinedBy = null, string? MembershipDate = null);
 public record AddChildRequest(int ChildId);
