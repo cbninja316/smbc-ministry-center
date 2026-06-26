@@ -45,6 +45,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasIndex(u => u.Username)
             .IsUnique();
 
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.SalaryDonateGivingCategory)
+            .WithMany()
+            .HasForeignKey(u => u.SalaryDonateGivingCategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<InviteToken>()
             .HasOne(t => t.User)
             .WithMany(u => u.InviteTokens)
@@ -171,6 +177,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Debt>()
             .Property(d => d.InterestRate)
             .HasColumnType("TEXT");
+
+        modelBuilder.Entity<Debt>()
+            .HasOne(d => d.BudgetCategory)
+            .WithMany()
+            .HasForeignKey(d => d.BudgetCategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<DebtPayment>()
             .HasOne(p => p.Debt)
