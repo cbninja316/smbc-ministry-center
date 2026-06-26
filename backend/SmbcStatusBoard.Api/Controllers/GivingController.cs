@@ -240,12 +240,39 @@ public class GivingController(AppDbContext db) : ControllerBase
         if (string.IsNullOrEmpty(secretKeySetting?.Value))
             return BadRequest(new { message = "Stripe is not configured." });
 
+        var uid = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var me = await db.Users.FindAsync(uid);
+        if (me == null) return Unauthorized();
+
         var client = new StripeClient(secretKeySetting.Value);
+
+        // Get or create Stripe Customer so the card is saved for future use
+        string customerId;
+        if (!string.IsNullOrEmpty(me.StripeCustomerId))
+        {
+            customerId = me.StripeCustomerId;
+        }
+        else
+        {
+            var custService = new CustomerService(client);
+            var customer = await custService.CreateAsync(new CustomerCreateOptions
+            {
+                Email = me.Email,
+                Name = $"{me.FirstName} {me.LastName}".Trim(),
+                Metadata = new Dictionary<string, string> { ["userId"] = uid.ToString() },
+            });
+            me.StripeCustomerId = customer.Id;
+            await db.SaveChangesAsync();
+            customerId = customer.Id;
+        }
+
         var service = new PaymentIntentService(client);
         var intent = await service.CreateAsync(new PaymentIntentCreateOptions
         {
             Amount = (long)Math.Round(req.Amount * 100),
             Currency = "usd",
+            Customer = customerId,
+            SetupFutureUsage = "on_session",
             AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true },
             Metadata = new Dictionary<string, string>
             {

@@ -34,6 +34,8 @@ public class User
 
     public string? PreferencesJson { get; set; }
 
+    public string? StripeCustomerId { get; set; }
+
     // Family
     public int? SpouseUserId { get; set; }
     public User? Spouse { get; set; }

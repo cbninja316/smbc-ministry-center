@@ -7,6 +7,7 @@ using SmbcStatusBoard.Api.Data;
 using SmbcStatusBoard.Api.DTOs;
 using SmbcStatusBoard.Api.Models;
 using SmbcStatusBoard.Api.Services;
+using Stripe;
 
 namespace SmbcStatusBoard.Api.Controllers;
 
@@ -266,18 +267,39 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
             .Concat(me.Spouse?.Children.Select(c => c.Id) ?? [])
             .ToHashSet();
 
+        // If the event has a cost and a payment intent was provided, verify it succeeded
+        var details2 = item.ChurchEventDetails;
+        var hasCost = HasEventCost(details2);
+        if (hasCost)
+        {
+            if (string.IsNullOrEmpty(req.StripePaymentIntentId))
+                return BadRequest(new { message = "Payment is required for this event." });
+
+            var secretKey = (await db.AppSettings.FindAsync("Stripe:SecretKey"))?.Value;
+            if (!string.IsNullOrEmpty(secretKey))
+            {
+                var client = new StripeClient(secretKey);
+                var piService = new PaymentIntentService(client);
+                var pi = await piService.GetAsync(req.StripePaymentIntentId);
+                if (pi.Status != "succeeded")
+                    return BadRequest(new { message = "Payment has not been confirmed." });
+            }
+        }
+
         foreach (var userId in req.UserIds ?? [])
         {
             if (!familyUserIds.Contains(userId)) return Forbid();
-            var already = await db.EventRegistrations.AnyAsync(r => r.ItemId == id && r.UserId == userId);
-            if (!already) db.EventRegistrations.Add(new EventRegistration { ItemId = id, UserId = userId });
+            var already = await db.EventRegistrations.FirstOrDefaultAsync(r => r.ItemId == id && r.UserId == userId);
+            if (already == null)
+                db.EventRegistrations.Add(new EventRegistration { ItemId = id, UserId = userId, StripePaymentIntentId = req.StripePaymentIntentId, AmountPaid = req.AmountPaid });
         }
 
         foreach (var childId in req.ChildIds ?? [])
         {
             if (!familyChildIds.Contains(childId)) return Forbid();
-            var already = await db.EventRegistrations.AnyAsync(r => r.ItemId == id && r.ChildId == childId);
-            if (!already) db.EventRegistrations.Add(new EventRegistration { ItemId = id, ChildId = childId });
+            var already = await db.EventRegistrations.FirstOrDefaultAsync(r => r.ItemId == id && r.ChildId == childId);
+            if (already == null)
+                db.EventRegistrations.Add(new EventRegistration { ItemId = id, ChildId = childId, StripePaymentIntentId = req.StripePaymentIntentId, AmountPaid = req.AmountPaid });
         }
 
         await db.SaveChangesAsync();
@@ -430,6 +452,152 @@ public class ItemsController(AppDbContext db, FileStorageService storage, EmailS
             userIds = regs.Where(r => r.UserId.HasValue).Select(r => r.UserId!.Value).ToList(),
             childIds = regs.Where(r => r.ChildId.HasValue).Select(r => r.ChildId!.Value).ToList(),
         });
+    }
+
+    // POST /api/items/{id}/payment-intent — calculate event cost and create a Stripe PaymentIntent
+    [HttpPost("{id}/payment-intent")]
+    [Authorize]
+    public async Task<IActionResult> CreateEventPaymentIntent(int id, [FromBody] EventPaymentIntentRequest req)
+    {
+        var item = await db.Items.FindAsync(id);
+        if (item == null) return NotFound();
+
+        var details = item.ChurchEventDetails;
+        if (!HasEventCost(details))
+            return BadRequest(new { message = "This event has no cost." });
+
+        var secretKey = (await db.AppSettings.FindAsync("Stripe:SecretKey"))?.Value;
+        if (string.IsNullOrEmpty(secretKey))
+            return BadRequest(new { message = "Stripe is not configured." });
+
+        var uid = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var me = await db.Users.Include(u => u.Children).Include(u => u.Spouse).ThenInclude(s => s!.Children)
+            .FirstOrDefaultAsync(u => u.Id == uid);
+        if (me == null) return NotFound();
+
+        // Calculate total cost
+        var total = CalculateEventCost(details, req.UserBirthDates ?? [], req.ChildBirthDates ?? []);
+        if (total <= 0)
+            return BadRequest(new { message = "Calculated cost is $0." });
+
+        var client = new StripeClient(secretKey);
+
+        // Get or create Stripe Customer for saved cards
+        string customerId;
+        if (!string.IsNullOrEmpty(me.StripeCustomerId))
+        {
+            customerId = me.StripeCustomerId;
+        }
+        else
+        {
+            var custService = new CustomerService(client);
+            var customer = await custService.CreateAsync(new CustomerCreateOptions
+            {
+                Email = me.Email,
+                Name = $"{me.FirstName} {me.LastName}".Trim(),
+                Metadata = new Dictionary<string, string> { ["userId"] = uid.ToString() },
+            });
+            me.StripeCustomerId = customer.Id;
+            await db.SaveChangesAsync();
+            customerId = customer.Id;
+        }
+
+        var piService = new PaymentIntentService(client);
+        var intent = await piService.CreateAsync(new PaymentIntentCreateOptions
+        {
+            Amount = (long)Math.Round(total * 100),
+            Currency = "usd",
+            Customer = customerId,
+            SetupFutureUsage = "on_session",
+            AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true },
+            Metadata = new Dictionary<string, string>
+            {
+                ["itemId"] = id.ToString(),
+                ["eventName"] = item.Name,
+            },
+        });
+
+        return Ok(new { clientSecret = intent.ClientSecret, amount = total });
+    }
+
+    // GET /api/items/payment-methods — list saved payment methods for current user
+    [HttpGet("payment-methods")]
+    [Authorize]
+    public async Task<IActionResult> GetPaymentMethods()
+    {
+        var uid = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var me = await db.Users.FindAsync(uid);
+        if (me == null || string.IsNullOrEmpty(me.StripeCustomerId))
+            return Ok(new { paymentMethods = Array.Empty<object>() });
+
+        var secretKey = (await db.AppSettings.FindAsync("Stripe:SecretKey"))?.Value;
+        if (string.IsNullOrEmpty(secretKey))
+            return Ok(new { paymentMethods = Array.Empty<object>() });
+
+        var client = new StripeClient(secretKey);
+        var pmService = new PaymentMethodService(client);
+        var pms = await pmService.ListAsync(new PaymentMethodListOptions
+        {
+            Customer = me.StripeCustomerId,
+            Type = "card",
+        });
+
+        return Ok(new
+        {
+            paymentMethods = pms.Data.Select(pm => new
+            {
+                id = pm.Id,
+                brand = pm.Card?.Brand,
+                last4 = pm.Card?.Last4,
+                expMonth = pm.Card?.ExpMonth,
+                expYear = pm.Card?.ExpYear,
+            })
+        });
+    }
+
+    private static bool HasEventCost(ChurchEventData? d)
+    {
+        if (d == null) return false;
+        return (d.CostType ?? "PerPerson") switch
+        {
+            "PerFamily" => d.FamilyCost > 0,
+            "Tiered" => d.AdultCost > 0 || d.SeniorCost > 0 || d.ChildCost > 0,
+            _ => d.Cost > 0,
+        };
+    }
+
+    private static decimal CalculateEventCost(ChurchEventData? d, string[] userBirthDates, string[] childBirthDates)
+    {
+        if (d == null) return 0;
+        var costType = d.CostType ?? "PerPerson";
+
+        if (costType == "PerFamily")
+            return d.FamilyCost ?? 0;
+
+        if (costType == "Tiered")
+        {
+            var total = 0m;
+            foreach (var bd in userBirthDates)
+                total += GetTieredCost(d, bd);
+            foreach (var bd in childBirthDates)
+                total += GetTieredCost(d, bd);
+            return total;
+        }
+
+        // PerPerson
+        return (d.Cost ?? 0) * (userBirthDates.Length + childBirthDates.Length);
+    }
+
+    private static decimal GetTieredCost(ChurchEventData d, string? birthDate)
+    {
+        if (string.IsNullOrEmpty(birthDate) || !DateOnly.TryParse(birthDate, out var dob))
+            return d.AdultCost ?? 0;
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var age = today.Year - dob.Year;
+        if (dob > today.AddYears(-age)) age--;
+        if (age >= 65) return d.SeniorCost ?? 0;
+        if (age < 18) return d.ChildCost ?? 0;
+        return d.AdultCost ?? 0;
     }
 
     private async Task AutoAdvanceStatusAsync()

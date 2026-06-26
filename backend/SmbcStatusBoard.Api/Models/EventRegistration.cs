@@ -14,4 +14,7 @@ public class EventRegistration
     public Child? Child { get; set; }
 
     public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
+
+    public string? StripePaymentIntentId { get; set; }
+    public decimal? AmountPaid { get; set; }
 }

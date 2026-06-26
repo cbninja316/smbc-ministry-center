@@ -22,7 +22,13 @@ public class ChurchEventData
     public string? StartTime { get; set; }
     public string? EndTime { get; set; }
     public string? Location { get; set; }
-    public decimal? Cost { get; set; }
+    // CostType: "PerPerson" (default), "PerFamily", "Tiered"
+    public string? CostType { get; set; }
+    public decimal? Cost { get; set; }        // used for PerPerson
+    public decimal? FamilyCost { get; set; }  // used for PerFamily
+    public decimal? AdultCost { get; set; }   // used for Tiered (18–64)
+    public decimal? SeniorCost { get; set; }  // used for Tiered (65+)
+    public decimal? ChildCost { get; set; }   // used for Tiered (under 18)
     public bool RegistrationRequired { get; set; }
     public bool PromoteFacebook { get; set; }
     public bool PromoteFacebookEvent { get; set; }
@@ -64,7 +70,8 @@ public class BenevolenceData
     public string? DateAssistanceProvided { get; set; }
 }
 
-public record EventRegisterRequest(int[]? UserIds, int[]? ChildIds);
+public record EventRegisterRequest(int[]? UserIds, int[]? ChildIds, string? StripePaymentIntentId = null, decimal? AmountPaid = null);
+public record EventPaymentIntentRequest(string[]? UserBirthDates, string[]? ChildBirthDates);
 
 public record ItemStatusUpdate(ItemStatus Status, int SortOrder);
 
