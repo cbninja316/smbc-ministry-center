@@ -215,4 +215,24 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         await db.SaveChangesAsync();
         return NoContent();
     }
+
+    // GET /api/users/by-email?email=... — any authenticated user can look up by email (for spouse autofill)
+    [HttpGet("by-email")]
+    [Authorize]
+    public async Task<IActionResult> GetByEmail([FromQuery] string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return BadRequest();
+        var normalized = email.Trim().ToLower();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == normalized && u.IsActive);
+        if (user == null) return NotFound();
+        return Ok(new
+        {
+            user.Id,
+            user.FirstName,
+            user.LastName,
+            user.Email,
+            Gender = user.Gender == null ? (string?)null : user.Gender.ToString(),
+            BirthDate = user.BirthDate?.ToString("yyyy-MM-dd"),
+        });
+    }
 }
