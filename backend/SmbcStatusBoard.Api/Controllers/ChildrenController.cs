@@ -37,10 +37,11 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
             FirstName = req.FirstName.Trim(),
             LastName = req.LastName.Trim(),
             BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : null,
+            Gender = req.Gender is not null && Enum.TryParse<Models.Gender>(req.Gender, true, out var cg) ? cg : null,
         };
         db.Children.Add(child);
         await db.SaveChangesAsync();
-        return Ok(new { child.Id, child.FirstName, child.LastName, child.BirthDate, child.CreatedAt });
+        return Ok(new { child.Id, child.FirstName, child.LastName, child.BirthDate, Gender = child.Gender?.ToString(), child.CreatedAt });
     }
 
     [HttpPut("{id}")]
@@ -52,8 +53,9 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
         child.FirstName = req.FirstName.Trim();
         child.LastName = req.LastName.Trim();
         child.BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : null;
+        if (req.Gender is not null && Enum.TryParse<Models.Gender>(req.Gender, true, out var ug)) child.Gender = ug;
         await db.SaveChangesAsync();
-        return Ok(new { child.Id, child.FirstName, child.LastName, child.BirthDate });
+        return Ok(new { child.Id, child.FirstName, child.LastName, child.BirthDate, Gender = child.Gender?.ToString() });
     }
 
     [HttpPost("{id}/promote-to-member")]
@@ -146,5 +148,5 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
     }
 }
 
-public record ChildPayload(string FirstName, string LastName, string? BirthDate);
+public record ChildPayload(string FirstName, string LastName, string? BirthDate, string? Gender = null);
 public record PromoteChildRequest(string Email, string? Role = null, List<string>? AllowedItemTypes = null);

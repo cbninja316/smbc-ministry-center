@@ -40,7 +40,9 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
             JoinedBy = u.JoinedBy == null ? (string?)null : u.JoinedBy.ToString(),
             u.MembershipDate,
             u.HasLeft,
-            u.IsDeceased
+            u.IsDeceased,
+            BirthDate = u.BirthDate == null ? (string?)null : u.BirthDate.Value.ToString("yyyy-MM-dd"),
+            Gender = u.Gender == null ? (string?)null : u.Gender.ToString(),
         }).ToListAsync();
 
         return Ok(users);
@@ -175,6 +177,8 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
             user.Email = normalEmail;
         }
         user.BirthDate = req.BirthDate is not null ? DateOnly.Parse(req.BirthDate) : user.BirthDate;
+        if (req.Gender is not null && Enum.TryParse<Models.Gender>(req.Gender, true, out var gender))
+            user.Gender = gender;
 
         await db.SaveChangesAsync();
         return Ok(new { message = "Profile updated." });

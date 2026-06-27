@@ -223,6 +223,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
             LastName = lastName,
             ParentUserId = uid,
             BirthDate = birthDate,
+            Gender = req.Gender is not null && Enum.TryParse<Gender>(req.Gender, true, out var fcg) ? fcg : null,
         };
         db.Children.Add(child);
         await db.SaveChangesAsync();
@@ -313,7 +314,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 .Concat(spouse?.Children ?? Enumerable.Empty<Child>())
                 .DistinctBy(c => c.Id)
                 .OrderBy(c => c.LastName).ThenBy(c => c.FirstName)
-                .Select(c => new { c.Id, c.FirstName, c.LastName, BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"), c.LinkedUserId })
+                .Select(c => new { c.Id, c.FirstName, c.LastName, BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"), Gender = c.Gender == null ? (string?)null : c.Gender.ToString(), c.LinkedUserId })
                 .ToList<object>();
 
             groups.Add(new
@@ -336,6 +337,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
         u.Email,
         u.IsActive,
         BirthDate = u.BirthDate?.ToString("yyyy-MM-dd"),
+        Gender = u.Gender == null ? (string?)null : u.Gender.ToString(),
         MembershipStatus = u.MembershipStatus.ToString(),
         JoinedBy = u.JoinedBy?.ToString(),
         MembershipDate = u.MembershipDate?.ToString("yyyy-MM-dd"),
@@ -493,6 +495,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 AllowedItemTypes = "",
                 IsActive = false,
                 BirthDate = string.IsNullOrWhiteSpace(p.BirthDate) ? null : DateOnly.Parse(p.BirthDate),
+                Gender = Enum.TryParse<Gender>(p.Gender, true, out var mg) ? mg : null,
                 MembershipStatus = Enum.TryParse<MembershipStatus>(p.MembershipStatus, out var ms) ? ms : MembershipStatus.NotAMember,
                 JoinedBy = Enum.TryParse<JoinedBy>(p.JoinedBy, out var jb) ? jb : null,
                 MembershipDate = string.IsNullOrWhiteSpace(p.MembershipDate) ? null : DateOnly.Parse(p.MembershipDate),
@@ -527,6 +530,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 FirstName = c.FirstName.Trim(),
                 LastName = c.LastName.Trim(),
                 BirthDate = string.IsNullOrWhiteSpace(c.BirthDate) ? null : DateOnly.Parse(c.BirthDate),
+                Gender = Enum.TryParse<Gender>(c.Gender, true, out var cg) ? cg : null,
                 ParentUserId = primary.Id,
             };
             db.Children.Add(child);
@@ -539,11 +543,11 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
 
 public record NewMemberPayload(
     string FirstName, string LastName, string Email,
-    string? BirthDate,
+    string? BirthDate, string? Gender,
     string? MembershipStatus, string? JoinedBy, string? MembershipDate,
     bool HasLeft, bool IsDeceased
 );
-public record NewChildPayload(string FirstName, string LastName, string? BirthDate);
+public record NewChildPayload(string FirstName, string LastName, string? BirthDate, string? Gender = null);
 public record CreateFamilyRequest(NewMemberPayload Primary, NewMemberPayload? Spouse, List<NewChildPayload>? Children);
 public record SpouseRequest(string FirstName, string LastName, string Email);
-public record FamilyChildRequest(string FirstName, string LastName, string? BirthDate);
+public record FamilyChildRequest(string FirstName, string LastName, string? BirthDate, string? Gender = null);

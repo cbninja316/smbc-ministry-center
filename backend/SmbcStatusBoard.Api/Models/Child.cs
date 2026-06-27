@@ -6,6 +6,7 @@ public class Child
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public DateOnly? BirthDate { get; set; }
+    public Gender? Gender { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public int? ParentUserId { get; set; }

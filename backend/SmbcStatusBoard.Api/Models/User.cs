@@ -3,6 +3,7 @@ namespace SmbcStatusBoard.Api.Models;
 public enum UserRole { Member, Admin, SuperAdmin }
 public enum MembershipStatus { NotAMember, Member }
 public enum JoinedBy { TransferByLetter, AcceptedChrist, StatementOfFaith }
+public enum Gender { Male, Female }
 
 public class User
 {
@@ -19,6 +20,7 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateOnly? BirthDate { get; set; }
+    public Gender? Gender { get; set; }
 
     // Church membership
     public MembershipStatus MembershipStatus { get; set; } = MembershipStatus.NotAMember;

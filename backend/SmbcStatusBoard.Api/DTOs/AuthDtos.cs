@@ -22,4 +22,4 @@ public record UpdateBirthDateRequest(string? BirthDate);
 
 public record UpdateMembershipRequest(string MembershipStatus, string? JoinedBy, DateTime? MembershipDate, bool HasLeft, bool IsDeceased);
 
-public record UpdateProfileRequest(string? FirstName, string? LastName, string? Email, string? BirthDate);
+public record UpdateProfileRequest(string? FirstName, string? LastName, string? Email, string? BirthDate, string? Gender);
