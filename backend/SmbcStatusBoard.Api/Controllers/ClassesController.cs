@@ -252,6 +252,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
             IsActive = false,
             EmailVerified = false,
             AllowedItemTypes = string.Empty,
+            Gender = req.Gender is not null && Enum.TryParse<Models.Gender>(req.Gender, true, out var ig) ? ig : null,
         };
         db.Users.Add(newUser);
         await db.SaveChangesAsync();
@@ -337,6 +338,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
             MembershipStatus = membershipStatus,
             JoinedBy = joinedBy,
             MembershipDate = membershipDate,
+            Gender = req.Gender is not null && Enum.TryParse<Models.Gender>(req.Gender, true, out var pg) ? pg : null,
         };
         db.Users.Add(newUser);
         await db.SaveChangesAsync();
@@ -484,6 +486,6 @@ file static class StringExtensions
 
 public record ClassPayload(string Title, string Description, int DayOfWeek, string ClassTime, ClassType Type, int? PromotionClassId);
 public record AddUserRequest(int UserId);
-public record InviteNewMemberRequest(string FirstName, string LastName, string Email);
-public record AddProspectRequest(string FirstName, string LastName, string? MembershipStatus = null, string? JoinedBy = null, string? MembershipDate = null);
+public record InviteNewMemberRequest(string FirstName, string LastName, string Email, string? Gender = null);
+public record AddProspectRequest(string FirstName, string LastName, string? MembershipStatus = null, string? JoinedBy = null, string? MembershipDate = null, string? Gender = null);
 public record AddChildRequest(int ChildId);
