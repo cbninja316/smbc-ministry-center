@@ -35,6 +35,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<EventRegistration> EventRegistrations => Set<EventRegistration>();
     public DbSet<SpecialEventTimeSlot> SpecialEventTimeSlots => Set<SpecialEventTimeSlot>();
     public DbSet<ChildCheckIn> ChildCheckIns => Set<ChildCheckIn>();
+    public DbSet<UserPreference> UserPreferences => Set<UserPreference>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -336,5 +337,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasIndex(c => c.CheckInToken)
             .IsUnique()
             .HasFilter("[CheckInToken] IS NOT NULL");
+
+        modelBuilder.Entity<UserPreference>()
+            .HasOne(p => p.User)
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserPreference>()
+            .HasIndex(p => new { p.UserId, p.Key })
+            .IsUnique();
     }
 }

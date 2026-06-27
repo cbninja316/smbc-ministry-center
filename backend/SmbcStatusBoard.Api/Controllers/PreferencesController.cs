@@ -1,41 +1,46 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SmbcStatusBoard.Api.Data;
+using SmbcStatusBoard.Api.Models;
+using System.Security.Claims;
 
 namespace SmbcStatusBoard.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/preferences")]
 [Authorize]
 public class PreferencesController(AppDbContext db) : ControllerBase
 {
-    [HttpGet]
-    public async Task<IActionResult> Get()
+    private int CurrentUserId() =>
+        int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    [HttpGet("{key}")]
+    public async Task<IActionResult> Get(string key)
     {
-        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
-
-        var user = await db.Users.FindAsync(userId);
-        if (user is null) return NotFound();
-
-        return Ok(new { data = user.PreferencesJson });
+        var pref = await db.UserPreferences
+            .FirstOrDefaultAsync(p => p.UserId == CurrentUserId() && p.Key == key);
+        return Ok(new { value = pref?.Value });
     }
 
-    [HttpPut]
-    public async Task<IActionResult> Save([FromBody] PreferencesSaveRequest req)
+    [HttpPut("{key}")]
+    public async Task<IActionResult> Put(string key, [FromBody] PrefRequest req)
     {
-        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
-
-        var user = await db.Users.FindAsync(userId);
-        if (user is null) return NotFound();
-
-        user.PreferencesJson = req.Data;
+        var userId = CurrentUserId();
+        var pref = await db.UserPreferences
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Key == key);
+        if (pref == null)
+        {
+            pref = new UserPreference { UserId = userId, Key = key, Value = req.Value };
+            db.UserPreferences.Add(pref);
+        }
+        else
+        {
+            pref.Value = req.Value;
+        }
         await db.SaveChangesAsync();
-
-        return Ok(new { message = "Preferences saved." });
+        return Ok(new { value = pref.Value });
     }
 }
 
-public record PreferencesSaveRequest(string Data);
+public record PrefRequest(string Value);
