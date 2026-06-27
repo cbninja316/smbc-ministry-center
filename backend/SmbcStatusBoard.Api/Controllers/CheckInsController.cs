@@ -67,7 +67,12 @@ public class CheckInsController(AppDbContext db) : ControllerBase
             .Include(c => c.ClassChildren.Where(cc => !cc.IsRemoved))
             .FirstOrDefaultAsync(c => c.CheckInToken == token);
         if (child == null) return NotFound(new { message = "Invalid QR code." });
-        if (!child.IsVerified) return BadRequest(new { message = "This child is not verified for check-in." });
+
+        // Only block unverified children if ALL their active classes require a pass
+        var anyClassRequiresPass = child.ClassChildren.Count == 0 ||
+            await db.Classes.AnyAsync(c => child.ClassChildren.Select(cc => cc.ClassId).Contains(c.Id) && c.RequiresChildPass);
+        if (!child.IsVerified && anyClassRequiresPass)
+            return BadRequest(new { message = "This child is not verified for check-in." });
 
         var adminId = CurrentUserId();
         var today = DateTime.UtcNow.Date;

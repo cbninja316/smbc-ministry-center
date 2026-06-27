@@ -117,6 +117,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
             DayOfWeek = req.DayOfWeek,
             ClassTime = req.ClassTime.Trim(),
             Type = req.Type,
+            RequiresChildPass = req.Type == ClassType.Children ? req.RequiresChildPass : false,
             PromotionClassId = req.PromotionClassId,
         };
         db.Classes.Add(cls);
@@ -139,6 +140,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         cls.DayOfWeek = req.DayOfWeek;
         cls.ClassTime = req.ClassTime.Trim();
         cls.Type = req.Type;
+        cls.RequiresChildPass = req.Type == ClassType.Children ? req.RequiresChildPass : false;
         cls.PromotionClassId = req.PromotionClassId;
         await db.SaveChangesAsync();
         return Ok(MapClass(cls));
@@ -451,6 +453,7 @@ public class ClassesController(AppDbContext db, EmailService email, IConfigurati
         c.DayOfWeek,
         c.ClassTime,
         Type = c.Type.ToString(),
+        c.RequiresChildPass,
         c.PromotionClassId,
         PromotionClassName = c.PromotionClass?.Title,
         c.CreatedAt,
@@ -484,7 +487,7 @@ file static class StringExtensions
     public static string? NullIfEmpty(this string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
 }
 
-public record ClassPayload(string Title, string Description, int DayOfWeek, string ClassTime, ClassType Type, int? PromotionClassId);
+public record ClassPayload(string Title, string Description, int DayOfWeek, string ClassTime, ClassType Type, bool RequiresChildPass = true, int? PromotionClassId = null);
 public record AddUserRequest(int UserId);
 public record InviteNewMemberRequest(string FirstName, string LastName, string Email, string? Gender = null);
 public record AddProspectRequest(string FirstName, string LastName, string? MembershipStatus = null, string? JoinedBy = null, string? MembershipDate = null, string? Gender = null);

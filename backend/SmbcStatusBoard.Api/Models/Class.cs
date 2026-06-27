@@ -10,6 +10,7 @@ public class Class
     public int DayOfWeek { get; set; }  // 0=Sunday … 6=Saturday
     public string ClassTime { get; set; } = string.Empty;  // e.g. "9:00 AM"
     public ClassType Type { get; set; }
+    public bool RequiresChildPass { get; set; } = true;
     public int? PromotionClassId { get; set; }
     public Class? PromotionClass { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

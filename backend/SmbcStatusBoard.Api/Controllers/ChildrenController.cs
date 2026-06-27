@@ -42,8 +42,14 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
     public async Task<IActionResult> GetUnverified()
     {
         if (!CanManageAttendance()) return Forbid();
+        // Only include children who are in at least one class that requires a pass
+        var childIdsNeedingPass = await db.ClassChildren
+            .Where(cc => !cc.IsRemoved && cc.Class.RequiresChildPass)
+            .Select(cc => cc.ChildId)
+            .Distinct()
+            .ToListAsync();
         var children = await db.Children
-            .Where(c => c.ParentUserId != null && !c.IsVerified)
+            .Where(c => c.ParentUserId != null && !c.IsVerified && childIdsNeedingPass.Contains(c.Id))
             .Include(c => c.ParentUser)
             .OrderBy(c => c.CreatedAt)
             .ToListAsync();
