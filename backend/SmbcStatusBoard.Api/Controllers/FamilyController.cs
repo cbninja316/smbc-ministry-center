@@ -54,6 +54,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 c.LastName,
                 BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"),
                 inAnyClass = c.ClassChildren.Any(cc => !cc.IsRemoved),
+                c.IsVerified,
             }),
         });
     }
@@ -316,7 +317,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
                 .Concat(spouse?.Children ?? Enumerable.Empty<Child>())
                 .DistinctBy(c => c.Id)
                 .OrderBy(c => c.LastName).ThenBy(c => c.FirstName)
-                .Select(c => new { c.Id, c.FirstName, c.LastName, BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"), Gender = c.Gender == null ? (string?)null : c.Gender.ToString(), c.LinkedUserId })
+                .Select(c => new { c.Id, c.FirstName, c.LastName, BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"), Gender = c.Gender == null ? (string?)null : c.Gender.ToString(), c.LinkedUserId, c.IsVerified })
                 .ToList<object>();
 
             groups.Add(new

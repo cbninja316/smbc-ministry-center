@@ -76,8 +76,18 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
         var userId = CurrentUserId();
         var child = await db.Children.FindAsync(id);
         if (child == null) return NotFound();
-        // Only the parent, attendance admins, or super admins can get the token
-        if (child.ParentUserId != userId && !CanManageAttendance())
+        // Allow: the parent, their spouse, attendance admins, and super admins
+        bool isParent = child.ParentUserId == userId;
+        bool isSpouse = false;
+        if (!isParent && child.ParentUserId.HasValue)
+        {
+            var parent = await db.Users
+                .Where(u => u.Id == child.ParentUserId.Value)
+                .Select(u => new { u.SpouseUserId })
+                .FirstOrDefaultAsync();
+            isSpouse = parent?.SpouseUserId == userId;
+        }
+        if (!isParent && !isSpouse && !CanManageAttendance())
             return Forbid();
         if (!child.IsVerified)
             return BadRequest(new { message = "This child has not been verified for check-in yet." });
