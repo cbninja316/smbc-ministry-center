@@ -128,6 +128,7 @@ public class FamilyController(AppDbContext db, EmailService email, IConfiguratio
             IsActive = false,
             EmailVerified = false,
             AllowedItemTypes = string.Empty,
+            Gender = req.Gender is not null && Enum.TryParse<Gender>(req.Gender, true, out var sg) ? sg : null,
         };
         db.Users.Add(newUser);
         await db.SaveChangesAsync();
@@ -549,5 +550,5 @@ public record NewMemberPayload(
 );
 public record NewChildPayload(string FirstName, string LastName, string? BirthDate, string? Gender = null);
 public record CreateFamilyRequest(NewMemberPayload Primary, NewMemberPayload? Spouse, List<NewChildPayload>? Children);
-public record SpouseRequest(string FirstName, string LastName, string Email);
+public record SpouseRequest(string FirstName, string LastName, string Email, string? Gender = null);
 public record FamilyChildRequest(string FirstName, string LastName, string? BirthDate, string? Gender = null);
