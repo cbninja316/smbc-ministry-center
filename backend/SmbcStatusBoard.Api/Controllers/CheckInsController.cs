@@ -87,14 +87,22 @@ public class CheckInsController(AppDbContext db) : ControllerBase
             var checkIn = new ChildCheckIn { ChildId = child.Id, CheckedInByUserId = adminId };
             db.ChildCheckIns.Add(checkIn);
 
-            // Mark the child attended in every class they belong to (today's session)
+            // Mark attended only in classes that meet today (matching day of week)
+            var todayDow = (int)today.DayOfWeek;
             var classIds = child.ClassChildren.Select(cc => cc.ClassId).ToList();
-            foreach (var classId in classIds)
+            if (classIds.Count > 0)
             {
-                var alreadyMarked = await db.ChildAttendances.AnyAsync(a =>
-                    a.ClassId == classId && a.ChildId == child.Id && a.SessionDate == todayDate);
-                if (!alreadyMarked)
-                    db.ChildAttendances.Add(new ChildAttendance { ClassId = classId, ChildId = child.Id, SessionDate = todayDate });
+                var classesForToday = await db.Classes
+                    .Where(c => classIds.Contains(c.Id) && c.DayOfWeek == todayDow)
+                    .Select(c => c.Id)
+                    .ToListAsync();
+                foreach (var classId in classesForToday)
+                {
+                    var alreadyMarked = await db.ChildAttendances.AnyAsync(a =>
+                        a.ClassId == classId && a.ChildId == child.Id && a.SessionDate == todayDate);
+                    if (!alreadyMarked)
+                        db.ChildAttendances.Add(new ChildAttendance { ClassId = classId, ChildId = child.Id, SessionDate = todayDate });
+                }
             }
 
             await db.SaveChangesAsync();
