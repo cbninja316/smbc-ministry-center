@@ -34,6 +34,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ChildLinkSuggestion> ChildLinkSuggestions => Set<ChildLinkSuggestion>();
     public DbSet<EventRegistration> EventRegistrations => Set<EventRegistration>();
     public DbSet<SpecialEventTimeSlot> SpecialEventTimeSlots => Set<SpecialEventTimeSlot>();
+    public DbSet<ChildCheckIn> ChildCheckIns => Set<ChildCheckIn>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -306,5 +307,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(s => s.SuggestedChildId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Child>()
+            .HasOne(c => c.VerifiedByUser)
+            .WithMany()
+            .HasForeignKey(c => c.VerifiedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ChildCheckIn>()
+            .HasOne(ci => ci.Child)
+            .WithMany()
+            .HasForeignKey(ci => ci.ChildId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ChildCheckIn>()
+            .HasOne(ci => ci.CheckedInByUser)
+            .WithMany()
+            .HasForeignKey(ci => ci.CheckedInByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ChildCheckIn>()
+            .HasOne(ci => ci.CheckedOutByUser)
+            .WithMany()
+            .HasForeignKey(ci => ci.CheckedOutByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Child>()
+            .HasIndex(c => c.CheckInToken)
+            .IsUnique()
+            .HasFilter("[CheckInToken] IS NOT NULL");
     }
 }

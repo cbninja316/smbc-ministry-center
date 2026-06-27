@@ -54,6 +54,37 @@ public class SettingsController(AppDbContext db) : ControllerBase
         return Ok(new { publishableKey = pub?.Value ?? "" });
     }
 
+    // GET /api/settings/printer
+    [HttpGet("printer")]
+    public async Task<IActionResult> GetPrinterSettings()
+    {
+        if (!IsSuperAdmin()) return Forbid();
+        var name = await db.AppSettings.FindAsync("Printer:Name");
+        var ip = await db.AppSettings.FindAsync("Printer:IpAddress");
+        var model = await db.AppSettings.FindAsync("Printer:Model");
+        var stickerSize = await db.AppSettings.FindAsync("Printer:StickerSize");
+        return Ok(new
+        {
+            name = name?.Value ?? "",
+            ipAddress = ip?.Value ?? "",
+            model = model?.Value ?? "",
+            stickerSize = stickerSize?.Value ?? "2.25x1.25",
+        });
+    }
+
+    // PUT /api/settings/printer
+    [HttpPut("printer")]
+    public async Task<IActionResult> PutPrinterSettings([FromBody] PrinterSettingsRequest req)
+    {
+        if (!IsSuperAdmin()) return Forbid();
+        await Upsert("Printer:Name", req.Name ?? "");
+        await Upsert("Printer:IpAddress", req.IpAddress ?? "");
+        await Upsert("Printer:Model", req.Model ?? "");
+        await Upsert("Printer:StickerSize", req.StickerSize ?? "2.25x1.25");
+        await db.SaveChangesAsync();
+        return Ok(new { message = "Printer settings saved." });
+    }
+
     private async Task Upsert(string key, string value)
     {
         var existing = await db.AppSettings.FindAsync(key);
@@ -65,3 +96,4 @@ public class SettingsController(AppDbContext db) : ControllerBase
 }
 
 public record StripeSettingsRequest(string? PublishableKey, string? SecretKey);
+public record PrinterSettingsRequest(string? Name, string? IpAddress, string? Model, string? StickerSize);

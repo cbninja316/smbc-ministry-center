@@ -1,0 +1,121 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SmbcStatusBoard.Api.Data;
+using SmbcStatusBoard.Api.Models;
+
+namespace SmbcStatusBoard.Api.Controllers;
+
+[ApiController]
+[Route("api/checkins")]
+[Authorize]
+public class CheckInsController(AppDbContext db) : ControllerBase
+{
+    private int CurrentUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private bool IsSuperAdmin() => User.IsInRole("SuperAdmin");
+    private bool CanManageAttendance() =>
+        IsSuperAdmin() ||
+        (User.FindFirstValue("AllowedItemTypes") ?? "").Split(',').Contains("Attendance", StringComparer.OrdinalIgnoreCase);
+
+    private static object ChildDto(Child c) => new
+    {
+        c.Id, c.FirstName, c.LastName,
+        BirthDate = c.BirthDate?.ToString("yyyy-MM-dd"),
+        Gender = c.Gender?.ToString(),
+        c.ParentUserId,
+        ParentName = c.ParentUser != null ? $"{c.ParentUser.FirstName} {c.ParentUser.LastName}" : (string?)null
+    };
+
+    private static object CheckInDto(ChildCheckIn ci) => new
+    {
+        ci.Id, ci.ChildId, ci.CheckedInAt, ci.CheckedOutAt, ci.IsManual
+    };
+
+    // GET /api/checkins/today — list all check-ins for today
+    [HttpGet("today")]
+    public async Task<IActionResult> Today()
+    {
+        if (!CanManageAttendance()) return Forbid();
+        var today = DateTime.UtcNow.Date;
+        var checkIns = await db.ChildCheckIns
+            .Include(ci => ci.Child)
+            .Where(ci => ci.CheckedInAt.Date == today)
+            .OrderByDescending(ci => ci.CheckedInAt)
+            .ToListAsync();
+        return Ok(checkIns.Select(ci => new
+        {
+            ci.Id,
+            ci.ChildId,
+            ChildName = $"{ci.Child.FirstName} {ci.Child.LastName}",
+            ci.CheckedInAt,
+            ci.CheckedOutAt,
+            ci.IsManual
+        }));
+    }
+
+    // POST /api/checkins/scan?token=xxx — QR scan: check in or out
+    [HttpPost("scan")]
+    public async Task<IActionResult> Scan([FromQuery] string token)
+    {
+        if (!CanManageAttendance()) return Forbid();
+        var child = await db.Children
+            .Include(c => c.ParentUser)
+            .FirstOrDefaultAsync(c => c.CheckInToken == token);
+        if (child == null) return NotFound(new { message = "Invalid QR code." });
+        if (!child.IsVerified) return BadRequest(new { message = "This child is not verified for check-in." });
+
+        var adminId = CurrentUserId();
+        var today = DateTime.UtcNow.Date;
+        var existing = await db.ChildCheckIns
+            .FirstOrDefaultAsync(ci => ci.ChildId == child.Id && ci.CheckedInAt.Date == today && ci.CheckedOutAt == null);
+
+        if (existing != null)
+        {
+            existing.CheckedOutAt = DateTime.UtcNow;
+            existing.CheckedOutByUserId = adminId;
+            await db.SaveChangesAsync();
+            return Ok(new { action = "checkout", child = ChildDto(child), checkIn = CheckInDto(existing) });
+        }
+        else
+        {
+            var checkIn = new ChildCheckIn { ChildId = child.Id, CheckedInByUserId = adminId };
+            db.ChildCheckIns.Add(checkIn);
+            await db.SaveChangesAsync();
+            return Ok(new { action = "checkin", child = ChildDto(child), checkIn = CheckInDto(checkIn) });
+        }
+    }
+
+    // POST /api/checkins/{childId}/manual — manual check-in (no parent QR), prints 2 stickers
+    [HttpPost("{childId}/manual")]
+    public async Task<IActionResult> ManualCheckIn(int childId)
+    {
+        if (!CanManageAttendance()) return Forbid();
+        var child = await db.Children.Include(c => c.ParentUser).FirstOrDefaultAsync(c => c.Id == childId);
+        if (child == null) return NotFound();
+        var adminId = CurrentUserId();
+        var today = DateTime.UtcNow.Date;
+        var existing = await db.ChildCheckIns
+            .FirstOrDefaultAsync(ci => ci.ChildId == childId && ci.CheckedInAt.Date == today && ci.CheckedOutAt == null);
+        if (existing != null) return Conflict(new { message = "Child is already checked in." });
+        var checkIn = new ChildCheckIn { ChildId = childId, CheckedInByUserId = adminId, IsManual = true };
+        db.ChildCheckIns.Add(checkIn);
+        await db.SaveChangesAsync();
+        return Ok(new { action = "checkin", child = ChildDto(child), checkIn = CheckInDto(checkIn), twoStickers = true });
+    }
+
+    // POST /api/checkins/{id}/checkout — manual check-out by check-in record ID
+    [HttpPost("{id}/checkout")]
+    public async Task<IActionResult> Checkout(int id)
+    {
+        if (!CanManageAttendance()) return Forbid();
+        var checkIn = await db.ChildCheckIns.Include(ci => ci.Child).ThenInclude(c => c.ParentUser)
+            .FirstOrDefaultAsync(ci => ci.Id == id);
+        if (checkIn == null) return NotFound();
+        if (checkIn.CheckedOutAt != null) return BadRequest(new { message = "Already checked out." });
+        checkIn.CheckedOutAt = DateTime.UtcNow;
+        checkIn.CheckedOutByUserId = CurrentUserId();
+        await db.SaveChangesAsync();
+        return Ok(new { action = "checkout", child = ChildDto(checkIn.Child), checkIn = CheckInDto(checkIn) });
+    }
+}

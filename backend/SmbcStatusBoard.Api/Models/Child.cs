@@ -15,5 +15,12 @@ public class Child
     public int? LinkedUserId { get; set; }
     public User? LinkedUser { get; set; }
 
+    // Check-in verification
+    public bool IsVerified { get; set; } = false;
+    public DateTime? VerifiedAt { get; set; }
+    public int? VerifiedByUserId { get; set; }
+    public User? VerifiedByUser { get; set; }
+    public string? CheckInToken { get; set; }
+
     public ICollection<ClassChild> ClassChildren { get; set; } = [];
 }

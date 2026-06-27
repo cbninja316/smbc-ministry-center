@@ -13,10 +13,14 @@ namespace SmbcStatusBoard.Api.Controllers;
 [Authorize]
 public class ChildrenController(AppDbContext db, EmailService emailService, IConfiguration config) : ControllerBase
 {
+    private int CurrentUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private bool IsSuperAdmin() => User.IsInRole("SuperAdmin");
     private bool CanManageClasses() =>
         IsSuperAdmin() ||
         (User.FindFirstValue("AllowedItemTypes") ?? "").Split(',').Contains("Classes", StringComparer.OrdinalIgnoreCase);
+    private bool CanManageAttendance() =>
+        IsSuperAdmin() ||
+        (User.FindFirstValue("AllowedItemTypes") ?? "").Split(',').Contains("Attendance", StringComparer.OrdinalIgnoreCase);
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
@@ -25,7 +29,64 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
         var children = await db.Children
             .OrderBy(c => c.LastName).ThenBy(c => c.FirstName)
             .ToListAsync();
-        return Ok(children);
+        return Ok(children.Select(c => new {
+            c.Id, c.FirstName, c.LastName, c.BirthDate,
+            Gender = c.Gender?.ToString(),
+            c.CreatedAt, c.ParentUserId, c.LinkedUserId,
+            c.IsVerified, c.VerifiedAt,
+            CheckInToken = (string?)null // don't expose token in list
+        }));
+    }
+
+    [HttpGet("unverified")]
+    public async Task<IActionResult> GetUnverified()
+    {
+        if (!CanManageAttendance()) return Forbid();
+        var children = await db.Children
+            .Where(c => c.ParentUserId != null && !c.IsVerified)
+            .Include(c => c.ParentUser)
+            .OrderBy(c => c.CreatedAt)
+            .ToListAsync();
+        return Ok(children.Select(c => new {
+            c.Id, c.FirstName, c.LastName, c.BirthDate,
+            Gender = c.Gender?.ToString(),
+            c.ParentUserId,
+            ParentName = c.ParentUser != null ? $"{c.ParentUser.FirstName} {c.ParentUser.LastName}" : null,
+            c.IsVerified
+        }));
+    }
+
+    [HttpPost("{id}/verify")]
+    public async Task<IActionResult> Verify(int id)
+    {
+        if (!CanManageAttendance()) return Forbid();
+        var child = await db.Children.FindAsync(id);
+        if (child == null) return NotFound();
+        child.IsVerified = true;
+        child.VerifiedAt = DateTime.UtcNow;
+        child.VerifiedByUserId = CurrentUserId();
+        child.CheckInToken ??= Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+        await db.SaveChangesAsync();
+        return Ok(new { child.Id, child.IsVerified, child.CheckInToken, child.VerifiedAt });
+    }
+
+    [HttpGet("{id}/checkin-token")]
+    public async Task<IActionResult> GetCheckInToken(int id)
+    {
+        var userId = CurrentUserId();
+        var child = await db.Children.FindAsync(id);
+        if (child == null) return NotFound();
+        // Only the parent, attendance admins, or super admins can get the token
+        if (child.ParentUserId != userId && !CanManageAttendance())
+            return Forbid();
+        if (!child.IsVerified)
+            return BadRequest(new { message = "This child has not been verified for check-in yet." });
+        if (child.CheckInToken == null)
+        {
+            child.CheckInToken = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+            await db.SaveChangesAsync();
+        }
+        return Ok(new { token = child.CheckInToken, child.FirstName, child.LastName, BirthDate = child.BirthDate?.ToString("yyyy-MM-dd") });
     }
 
     [HttpPost]
