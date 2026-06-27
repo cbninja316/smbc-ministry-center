@@ -14,7 +14,7 @@ public record ResetPasswordRequest(string Token, string Password);
 
 public record ChangePasswordRequest(string NewPassword);
 
-public record RegisterRequest(string FirstName, string LastName, string Email, string Password, string ConfirmPassword, string? BirthDate = null);
+public record RegisterRequest(string FirstName, string LastName, string Email, string Password, string ConfirmPassword, string? BirthDate = null, string? Gender = null);
 
 public record UpdateUserRoleRequest(string Role);
 

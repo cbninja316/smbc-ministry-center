@@ -156,6 +156,10 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         if (!string.IsNullOrWhiteSpace(req.BirthDate) && DateOnly.TryParse(req.BirthDate, out var parsedBirth))
             birthDate = parsedBirth;
 
+        Models.Gender? gender = null;
+        if (!string.IsNullOrWhiteSpace(req.Gender) && Enum.TryParse<Models.Gender>(req.Gender, true, out var parsedGender))
+            gender = parsedGender;
+
         var user = new User
         {
             FirstName = req.FirstName.Trim(),
@@ -167,7 +171,8 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
             IsActive = false,
             EmailVerified = false,
             AllowedItemTypes = string.Empty,
-            BirthDate = birthDate
+            BirthDate = birthDate,
+            Gender = gender,
         };
 
         db.Users.Add(user);
