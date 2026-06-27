@@ -29,7 +29,10 @@ public class CheckInsController(AppDbContext db) : ControllerBase
 
     private static object CheckInDto(ChildCheckIn ci) => new
     {
-        ci.Id, ci.ChildId, ci.CheckedInAt, ci.CheckedOutAt, ci.IsManual
+        ci.Id, ci.ChildId,
+        CheckedInAt = DateTime.SpecifyKind(ci.CheckedInAt, DateTimeKind.Utc),
+        CheckedOutAt = ci.CheckedOutAt.HasValue ? DateTime.SpecifyKind(ci.CheckedOutAt.Value, DateTimeKind.Utc) : (DateTime?)null,
+        ci.IsManual
     };
 
     // GET /api/checkins/today — list all check-ins for today
@@ -48,8 +51,8 @@ public class CheckInsController(AppDbContext db) : ControllerBase
             ci.Id,
             ci.ChildId,
             ChildName = $"{ci.Child.FirstName} {ci.Child.LastName}",
-            ci.CheckedInAt,
-            ci.CheckedOutAt,
+            CheckedInAt = DateTime.SpecifyKind(ci.CheckedInAt, DateTimeKind.Utc),
+            CheckedOutAt = ci.CheckedOutAt.HasValue ? DateTime.SpecifyKind(ci.CheckedOutAt.Value, DateTimeKind.Utc) : (DateTime?)null,
             ci.IsManual
         }));
     }
@@ -61,12 +64,14 @@ public class CheckInsController(AppDbContext db) : ControllerBase
         if (!CanManageAttendance()) return Forbid();
         var child = await db.Children
             .Include(c => c.ParentUser)
+            .Include(c => c.ClassChildren.Where(cc => !cc.IsRemoved))
             .FirstOrDefaultAsync(c => c.CheckInToken == token);
         if (child == null) return NotFound(new { message = "Invalid QR code." });
         if (!child.IsVerified) return BadRequest(new { message = "This child is not verified for check-in." });
 
         var adminId = CurrentUserId();
         var today = DateTime.UtcNow.Date;
+        var todayDate = DateOnly.FromDateTime(today);
         var existing = await db.ChildCheckIns
             .FirstOrDefaultAsync(ci => ci.ChildId == child.Id && ci.CheckedInAt.Date == today && ci.CheckedOutAt == null);
 
@@ -81,6 +86,17 @@ public class CheckInsController(AppDbContext db) : ControllerBase
         {
             var checkIn = new ChildCheckIn { ChildId = child.Id, CheckedInByUserId = adminId };
             db.ChildCheckIns.Add(checkIn);
+
+            // Mark the child attended in every class they belong to (today's session)
+            var classIds = child.ClassChildren.Select(cc => cc.ClassId).ToList();
+            foreach (var classId in classIds)
+            {
+                var alreadyMarked = await db.ChildAttendances.AnyAsync(a =>
+                    a.ClassId == classId && a.ChildId == child.Id && a.SessionDate == todayDate);
+                if (!alreadyMarked)
+                    db.ChildAttendances.Add(new ChildAttendance { ClassId = classId, ChildId = child.Id, SessionDate = todayDate });
+            }
+
             await db.SaveChangesAsync();
             return Ok(new { action = "checkin", child = ChildDto(child), checkIn = CheckInDto(checkIn) });
         }
