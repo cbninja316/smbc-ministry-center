@@ -40,6 +40,8 @@ public class ChurchEventData
     public bool IsOneAccordRegistration { get; set; }
     public int? AgeMin { get; set; }
     public int? AgeMax { get; set; }
+    // Recurrence: "Weekly", "Monthly", "Yearly", or null for one-time
+    public string? RecurrenceFrequency { get; set; }
 }
 
 public class BenevolenceData
