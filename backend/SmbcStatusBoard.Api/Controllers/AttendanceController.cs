@@ -368,7 +368,18 @@ public class AttendanceController(AppDbContext db) : ControllerBase
             .Where(a => a.ClassId == classId && a.SessionDate >= from && a.SessionDate <= to)
             .ToListAsync();
 
-        var memberRows = cls.Members.Select(m => new
+        // Get check-in/out log for children in this class within the period
+        var childIdsInClass = cls.ClassChildren.Where(cc => !cc.IsRemoved).Select(cc => cc.ChildId).ToList();
+        var fromUtc = from == DateOnly.MinValue ? DateTime.MinValue : from.ToDateTime(TimeOnly.MinValue);
+        var toUtc = to.ToDateTime(TimeOnly.MaxValue);
+        var checkInLogs = childIdsInClass.Count > 0
+            ? await db.ChildCheckIns
+                .Where(ci => childIdsInClass.Contains(ci.ChildId) && ci.CheckedInAt >= fromUtc && ci.CheckedInAt <= toUtc)
+                .OrderBy(ci => ci.CheckedInAt)
+                .ToListAsync()
+            : [];
+
+        var memberRows = cls.Members.Where(m => !m.IsRemoved).Select(m => new
         {
             Name = m.User == null
                 ? $"{m.InviteFirstName} {m.InviteLastName}".Trim()
@@ -377,11 +388,17 @@ public class AttendanceController(AppDbContext db) : ControllerBase
                 .Select(r => r.SessionDate.ToString("yyyy-MM-dd")).OrderBy(d => d).ToList(),
         });
 
-        var childRows = cls.ClassChildren.Select(cc => new
+        var childRows = cls.ClassChildren.Where(cc => !cc.IsRemoved).Select(cc => new
         {
             Name = $"{cc.Child.FirstName} {cc.Child.LastName}",
             Sessions = childRecords.Where(r => r.ChildId == cc.ChildId)
                 .Select(r => r.SessionDate.ToString("yyyy-MM-dd")).OrderBy(d => d).ToList(),
+            CheckIns = checkInLogs.Where(ci => ci.ChildId == cc.ChildId).Select(ci => new
+            {
+                CheckedInAt = DateTime.SpecifyKind(ci.CheckedInAt, DateTimeKind.Utc),
+                CheckedOutAt = ci.CheckedOutAt.HasValue ? DateTime.SpecifyKind(ci.CheckedOutAt.Value, DateTimeKind.Utc) : (DateTime?)null,
+                ci.IsManual,
+            }).ToList(),
         });
 
         return Ok(new
