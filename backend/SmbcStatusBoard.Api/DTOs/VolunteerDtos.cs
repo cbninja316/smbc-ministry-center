@@ -2,8 +2,8 @@ using SmbcStatusBoard.Api.Models;
 namespace SmbcStatusBoard.Api.DTOs;
 
 public record TimeSlotRequest(string Time, string Label, int SortOrder = 0);
-public record CreateRoleRequest(string Label, string Description, int? SpecialEventId = null, List<TimeSlotRequest>? TimeSlots = null);
-public record UpdateRoleRequest(string Label, string Description, List<TimeSlotRequest>? TimeSlots = null);
+public record CreateRoleRequest(string Label, string Description, int? SpecialEventId = null, List<TimeSlotRequest>? TimeSlots = null, int? WorshipServiceTypeId = null);
+public record UpdateRoleRequest(string Label, string Description, List<TimeSlotRequest>? TimeSlots = null, int? WorshipServiceTypeId = null);
 public record CreateAssignmentRequest(int RoleId, int UserId, DateTime SundayDate);
 
 public class TimeSlotResponse
@@ -21,6 +21,8 @@ public class VolunteerRoleResponse
     public string Description { get; set; } = string.Empty;
     public int SortOrder { get; set; }
     public int? SpecialEventId { get; set; }
+    public int? WorshipServiceTypeId { get; set; }
+    public string? WorshipServiceTypeName { get; set; }
     public List<TimeSlotResponse> TimeSlots { get; set; } = new();
 }
 

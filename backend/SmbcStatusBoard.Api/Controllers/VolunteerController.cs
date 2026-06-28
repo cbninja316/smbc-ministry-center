@@ -25,6 +25,8 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
     {
         Id = r.Id, Label = r.Label, Description = r.Description,
         SortOrder = r.SortOrder, SpecialEventId = r.SpecialEventId,
+        WorshipServiceTypeId = r.WorshipServiceTypeId,
+        WorshipServiceTypeName = r.WorshipServiceType?.Name,
         TimeSlots = r.TimeSlots.OrderBy(t => t.SortOrder).Select(t => new TimeSlotResponse
         {
             Id = t.Id, Time = t.Time, Label = t.Label, SortOrder = t.SortOrder
@@ -38,6 +40,7 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
         if (!CanManageVolunteers()) return Forbid();
         var roles = await db.VolunteerRoles
             .Include(r => r.TimeSlots)
+            .Include(r => r.WorshipServiceType)
             .Where(r => r.SpecialEventId == specialEventId)
             .OrderBy(r => r.SortOrder)
             .ToListAsync();
@@ -51,13 +54,14 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
         if (!CanManageVolunteers()) return Forbid();
         if (string.IsNullOrWhiteSpace(req.Label)) return BadRequest(new { message = "Label is required." });
         var count = await db.VolunteerRoles.CountAsync(r => r.SpecialEventId == req.SpecialEventId);
-        var role = new VolunteerRole { Label = req.Label, Description = req.Description ?? "", SortOrder = count, SpecialEventId = req.SpecialEventId };
+        var role = new VolunteerRole { Label = req.Label, Description = req.Description ?? "", SortOrder = count, SpecialEventId = req.SpecialEventId, WorshipServiceTypeId = req.WorshipServiceTypeId };
         if (req.TimeSlots != null)
             for (int i = 0; i < req.TimeSlots.Count; i++)
                 role.TimeSlots.Add(new RoleTimeSlot { Time = req.TimeSlots[i].Time, Label = req.TimeSlots[i].Label, SortOrder = i });
         db.VolunteerRoles.Add(role);
         await db.SaveChangesAsync();
         await db.Entry(role).Collection(r => r.TimeSlots).LoadAsync();
+        await db.Entry(role).Reference(r => r.WorshipServiceType).LoadAsync();
         return CreatedAtAction(nameof(GetRoles), ToRoleResponse(role));
     }
 
@@ -67,10 +71,11 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
     {
         if (!CanManageVolunteers()) return Forbid();
         if (string.IsNullOrWhiteSpace(req.Label)) return BadRequest(new { message = "Label is required." });
-        var role = await db.VolunteerRoles.Include(r => r.TimeSlots).FirstOrDefaultAsync(r => r.Id == id);
+        var role = await db.VolunteerRoles.Include(r => r.TimeSlots).Include(r => r.WorshipServiceType).FirstOrDefaultAsync(r => r.Id == id);
         if (role is null) return NotFound();
         role.Label = req.Label;
         role.Description = req.Description ?? "";
+        role.WorshipServiceTypeId = req.WorshipServiceTypeId;
         // Replace time slots
         db.RoleTimeSlots.RemoveRange(role.TimeSlots);
         role.TimeSlots.Clear();

@@ -18,6 +18,29 @@ public class ServeAssignmentResponse
     public string RoleLabel { get; set; } = string.Empty;
     public string RoleDescription { get; set; } = string.Empty;
     public List<ServeTimeSlotResponse> TimeSlots { get; set; } = new();
+    public WorshipPlanSummary? WorshipPlan { get; set; }
+}
+
+public class WorshipPlanSummary
+{
+    public int ServiceTypeId { get; set; }
+    public string ServiceTypeName { get; set; } = string.Empty;
+    public string? StartTime { get; set; }
+    public List<WorshipPlanSummarySection> Sections { get; set; } = new();
+}
+
+public class WorshipPlanSummarySection
+{
+    public string Title { get; set; } = string.Empty;
+    public List<WorshipPlanSummaryItem> Items { get; set; } = new();
+}
+
+public class WorshipPlanSummaryItem
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Artist { get; set; }
+    public string? LeaderName { get; set; }
+    public int? DurationSeconds { get; set; }
 }
 
 public class ServeTimeSlotResponse
@@ -46,24 +69,58 @@ public class ServeController(AppDbContext db, EmailService emailService, IConfig
 
         var assignments = await db.VolunteerAssignments
             .Include(a => a.Role).ThenInclude(r => r.TimeSlots)
+            .Include(a => a.Role).ThenInclude(r => r.WorshipServiceType)
             .Where(a => a.UserId == userId && a.Status != AssignmentStatus.Rejected)
             .OrderBy(a => a.SundayDate)
             .ToListAsync();
 
-        return Ok(assignments.Select(a => new ServeAssignmentResponse
+        var results = new List<ServeAssignmentResponse>();
+        foreach (var a in assignments)
         {
-            Id = a.Id,
-            Status = a.Status.ToString(),
-            Date = a.SundayDate.ToString("MMMM d, yyyy"),
-            CreatedAt = a.CreatedAt.ToString("MMMM d, yyyy"),
-            RoleId = a.RoleId,
-            RoleLabel = a.Role.Label,
-            RoleDescription = a.Role.Description,
-            TimeSlots = a.Role.TimeSlots
-                .OrderBy(t => t.SortOrder)
-                .Select(t => new ServeTimeSlotResponse { Time = t.Time, Label = t.Label })
-                .ToList()
-        }));
+            WorshipPlanSummary? planSummary = null;
+            if (a.Role.WorshipServiceTypeId.HasValue)
+            {
+                var planDate = DateOnly.FromDateTime(a.SundayDate);
+                var plan = await db.WorshipPlans
+                    .Include(p => p.Sections).ThenInclude(s => s.Items).ThenInclude(i => i.Song)
+                    .FirstOrDefaultAsync(p => p.ServiceTypeId == a.Role.WorshipServiceTypeId.Value && p.PlanDate == planDate);
+
+                planSummary = new WorshipPlanSummary
+                {
+                    ServiceTypeId = a.Role.WorshipServiceTypeId.Value,
+                    ServiceTypeName = a.Role.WorshipServiceType?.Name ?? "",
+                    StartTime = plan?.StartTime?.ToString("HH:mm"),
+                    Sections = plan?.Sections.OrderBy(s => s.Order).Select(s => new WorshipPlanSummarySection
+                    {
+                        Title = s.Title,
+                        Items = s.Items.OrderBy(i => i.Order).Select(i => new WorshipPlanSummaryItem
+                        {
+                            Title = i.Song != null ? i.Song.Title : (i.EventTitle ?? ""),
+                            Artist = i.Song?.Artist,
+                            LeaderName = i.LeaderName,
+                            DurationSeconds = i.DurationSeconds,
+                        }).ToList()
+                    }).ToList() ?? new()
+                };
+            }
+
+            results.Add(new ServeAssignmentResponse
+            {
+                Id = a.Id,
+                Status = a.Status.ToString(),
+                Date = a.SundayDate.ToString("MMMM d, yyyy"),
+                CreatedAt = a.CreatedAt.ToString("MMMM d, yyyy"),
+                RoleId = a.RoleId,
+                RoleLabel = a.Role.Label,
+                RoleDescription = a.Role.Description,
+                TimeSlots = a.Role.TimeSlots
+                    .OrderBy(t => t.SortOrder)
+                    .Select(t => new ServeTimeSlotResponse { Time = t.Time, Label = t.Label })
+                    .ToList(),
+                WorshipPlan = planSummary,
+            });
+        }
+        return Ok(results);
     }
 
     // POST /api/serve/assignments/{id}/accept

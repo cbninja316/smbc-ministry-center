@@ -9,4 +9,5 @@ public class WorshipServiceType
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<WorshipPlan> Plans { get; set; } = [];
+    public ICollection<VolunteerRole> VolunteerRoles { get; set; } = [];
 }
