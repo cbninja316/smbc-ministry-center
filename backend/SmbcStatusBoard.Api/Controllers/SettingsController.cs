@@ -54,32 +54,7 @@ public class SettingsController(AppDbContext db) : ControllerBase
         return Ok(new { publishableKey = pub?.Value ?? "" });
     }
 
-    // ── PraiseCharts settings ─────────────────────────────────────────────────
-
-    [HttpGet("praisecharts")]
-    public async Task<IActionResult> GetPraiseChartsSettings()
-    {
-        if (!IsSuperAdmin()) return Forbid();
-        var ck = await db.AppSettings.FindAsync("PraiseCharts:ConsumerKey");
-        var at = await db.AppSettings.FindAsync("PraiseCharts:AccessToken");
-        return Ok(new
-        {
-            consumerKeySet = !string.IsNullOrEmpty(ck?.Value),
-            accessTokenSet = !string.IsNullOrEmpty(at?.Value),
-        });
-    }
-
-    [HttpPut("praisecharts")]
-    public async Task<IActionResult> PutPraiseChartsSettings([FromBody] PraiseChartsSettingsRequest req)
-    {
-        if (!IsSuperAdmin()) return Forbid();
-        if (!string.IsNullOrEmpty(req.ConsumerKey)) await Upsert("PraiseCharts:ConsumerKey", req.ConsumerKey);
-        if (!string.IsNullOrEmpty(req.ConsumerSecret)) await Upsert("PraiseCharts:ConsumerSecret", req.ConsumerSecret);
-        if (!string.IsNullOrEmpty(req.AccessToken)) await Upsert("PraiseCharts:AccessToken", req.AccessToken);
-        if (!string.IsNullOrEmpty(req.AccessSecret)) await Upsert("PraiseCharts:AccessSecret", req.AccessSecret);
-        await db.SaveChangesAsync();
-        return Ok(new { message = "PraiseCharts settings saved." });
-    }
+    // ── PraiseCharts settings — disconnect only; connect via /api/praisecharts/oauth ──
 
     [HttpDelete("praisecharts/disconnect")]
     public async Task<IActionResult> DisconnectPraiseCharts()
@@ -137,4 +112,3 @@ public class SettingsController(AppDbContext db) : ControllerBase
 
 public record StripeSettingsRequest(string? PublishableKey, string? SecretKey);
 public record PrinterSettingsRequest(string? Name, string? IpAddress, string? Model, string? StickerSize);
-public record PraiseChartsSettingsRequest(string? ConsumerKey, string? ConsumerSecret, string? AccessToken, string? AccessSecret);

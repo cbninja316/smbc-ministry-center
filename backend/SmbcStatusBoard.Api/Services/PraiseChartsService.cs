@@ -6,22 +6,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace SmbcStatusBoard.Api.Services;
 
-public class PraiseChartsService(AppDbContext db, IHttpClientFactory httpClientFactory)
+public class PraiseChartsService(AppDbContext db, IHttpClientFactory httpClientFactory, IConfiguration config)
 {
     private const string ApiBase = "https://api.praisecharts.com/v3";
 
     // ── OAuth credential helpers ─────────────────────────────────────────────
 
-    public async Task<(string? consumerKey, string? consumerSecret, string? accessToken, string? accessSecret)> GetCredentialsAsync()
+    // App-level credentials — set once by the developer in appsettings.json, never stored in DB.
+    public string? ConsumerKey => config["PraiseCharts:ConsumerKey"];
+    public string? ConsumerSecret => config["PraiseCharts:ConsumerSecret"];
+    public bool AppKeyConfigured => !string.IsNullOrEmpty(ConsumerKey) && !string.IsNullOrEmpty(ConsumerSecret);
+
+    // Per-church credentials — stored in DB after the church completes the OAuth flow.
+    public async Task<(string? accessToken, string? accessSecret)> GetAccessTokenAsync()
     {
-        var keys = new[] { "PraiseCharts:ConsumerKey", "PraiseCharts:ConsumerSecret", "PraiseCharts:AccessToken", "PraiseCharts:AccessSecret" };
+        var keys = new[] { "PraiseCharts:AccessToken", "PraiseCharts:AccessSecret" };
         var settings = await db.AppSettings.Where(s => keys.Contains(s.Key)).ToListAsync();
         return (
-            settings.FirstOrDefault(s => s.Key == "PraiseCharts:ConsumerKey")?.Value,
-            settings.FirstOrDefault(s => s.Key == "PraiseCharts:ConsumerSecret")?.Value,
             settings.FirstOrDefault(s => s.Key == "PraiseCharts:AccessToken")?.Value,
             settings.FirstOrDefault(s => s.Key == "PraiseCharts:AccessSecret")?.Value
         );
+    }
+
+    public async Task<(string? consumerKey, string? consumerSecret, string? accessToken, string? accessSecret)> GetCredentialsAsync()
+    {
+        var (at, asc) = await GetAccessTokenAsync();
+        return (ConsumerKey, ConsumerSecret, at, asc);
     }
 
     public bool IsConfigured(string? consumerKey, string? consumerSecret, string? accessToken, string? accessSecret)

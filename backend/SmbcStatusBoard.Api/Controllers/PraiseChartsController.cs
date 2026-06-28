@@ -23,8 +23,12 @@ public class PraiseChartsController(AppDbContext db, PraiseChartsService pc, ICo
     public async Task<IActionResult> Status()
     {
         if (!CanWorship()) return Forbid();
-        var (ck, cs, at, asc) = await pc.GetCredentialsAsync();
-        return Ok(new { connected = pc.IsConfigured(ck, cs, at, asc) });
+        var (at, asc) = await pc.GetAccessTokenAsync();
+        return Ok(new
+        {
+            appKeyConfigured = pc.AppKeyConfigured,
+            connected = pc.AppKeyConfigured && !string.IsNullOrEmpty(at) && !string.IsNullOrEmpty(asc),
+        });
     }
 
     // GET /api/praisecharts/library — proxy the user's purchased library
@@ -85,18 +89,15 @@ public class PraiseChartsController(AppDbContext db, PraiseChartsService pc, ICo
     [HttpPost("oauth/start")]
     public async Task<IActionResult> OAuthStart()
     {
-        if (!User.IsInRole("SuperAdmin")) return Forbid();
-        var ck = (await db.AppSettings.FindAsync("PraiseCharts:ConsumerKey"))?.Value;
-        var cs = (await db.AppSettings.FindAsync("PraiseCharts:ConsumerSecret"))?.Value;
-        if (string.IsNullOrEmpty(ck) || string.IsNullOrEmpty(cs))
-            return BadRequest(new { message = "Consumer Key and Secret must be saved first." });
+        if (!CanWorship()) return Forbid();
+        if (!pc.AppKeyConfigured)
+            return BadRequest(new { message = "PraiseCharts integration is not configured on this server." });
 
         var frontendUrl = config["App:NextFrontendUrl"] ?? config["App:SiteUrl"] ?? config["App:FrontendUrl"] ?? "http://localhost:3000";
         var callbackUrl = $"{frontendUrl}/settings?pc_callback=1";
-        var (requestToken, requestSecret) = await pc.GetRequestTokenAsync(ck, cs, callbackUrl);
+        var (requestToken, requestSecret) = await pc.GetRequestTokenAsync(pc.ConsumerKey!, pc.ConsumerSecret!, callbackUrl);
         if (requestToken == null) return StatusCode(502, new { message = "Failed to get request token from PraiseCharts." });
 
-        // Store request secret temporarily in AppSettings (keyed by token)
         await UpsertSetting($"PraiseCharts:RequestSecret:{requestToken}", requestSecret!);
         await db.SaveChangesAsync();
 
@@ -107,15 +108,15 @@ public class PraiseChartsController(AppDbContext db, PraiseChartsService pc, ICo
     [HttpPost("oauth/callback")]
     public async Task<IActionResult> OAuthCallback([FromBody] OAuthCallbackRequest req)
     {
-        if (!User.IsInRole("SuperAdmin")) return Forbid();
-        var ck = (await db.AppSettings.FindAsync("PraiseCharts:ConsumerKey"))?.Value;
-        var cs = (await db.AppSettings.FindAsync("PraiseCharts:ConsumerSecret"))?.Value;
+        if (!CanWorship()) return Forbid();
+        if (!pc.AppKeyConfigured)
+            return BadRequest(new { message = "PraiseCharts integration is not configured on this server." });
+
         var requestSecretEntry = await db.AppSettings.FindAsync($"PraiseCharts:RequestSecret:{req.OauthToken}");
-        if (string.IsNullOrEmpty(ck) || string.IsNullOrEmpty(cs) || requestSecretEntry == null)
-            return BadRequest(new { message = "Invalid OAuth state." });
+        if (requestSecretEntry == null) return BadRequest(new { message = "Invalid OAuth state." });
 
         var (accessToken, accessSecret) = await pc.ExchangeForAccessTokenAsync(
-            ck, cs, req.OauthToken, requestSecretEntry.Value, req.OauthVerifier);
+            pc.ConsumerKey!, pc.ConsumerSecret!, req.OauthToken, requestSecretEntry.Value, req.OauthVerifier);
         if (accessToken == null) return StatusCode(502, new { message = "Failed to exchange token." });
 
         await UpsertSetting("PraiseCharts:AccessToken", accessToken);
