@@ -30,6 +30,11 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<FileStorageService>();
+builder.Services.AddScoped<PraiseChartsService>();
+builder.Services.AddHttpClient("PraiseCharts", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddControllers()
     .AddJsonOptions(opts =>
         opts.JsonSerializerOptions.Converters.Add(

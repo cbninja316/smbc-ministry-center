@@ -36,6 +36,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SpecialEventTimeSlot> SpecialEventTimeSlots => Set<SpecialEventTimeSlot>();
     public DbSet<ChildCheckIn> ChildCheckIns => Set<ChildCheckIn>();
     public DbSet<UserPreference> UserPreferences => Set<UserPreference>();
+    public DbSet<WorshipSong> WorshipSongs => Set<WorshipSong>();
+    public DbSet<WorshipServiceType> WorshipServiceTypes => Set<WorshipServiceType>();
+    public DbSet<WorshipPlan> WorshipPlans => Set<WorshipPlan>();
+    public DbSet<WorshipPlanSection> WorshipPlanSections => Set<WorshipPlanSection>();
+    public DbSet<WorshipPlanItem> WorshipPlanItems => Set<WorshipPlanItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
