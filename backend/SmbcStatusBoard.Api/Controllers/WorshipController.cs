@@ -235,6 +235,7 @@ public class WorshipController(AppDbContext db, IConfiguration config) : Control
             db.WorshipPlans.Add(plan);
         }
         plan.UpdatedAt = DateTime.UtcNow;
+        plan.StartTime = req.StartTime != null && TimeOnly.TryParse(req.StartTime, out var st) ? st : (TimeOnly?)null;
 
         // Sync sections
         var existingSecIds = plan.Sections.Select(s => s.Id).ToHashSet();
@@ -333,6 +334,7 @@ public class WorshipController(AppDbContext db, IConfiguration config) : Control
     {
         p.Id, p.ServiceTypeId,
         date = p.PlanDate.ToString("yyyy-MM-dd"),
+        startTime = p.StartTime.HasValue ? p.StartTime.Value.ToString("HH:mm") : null,
         p.UpdatedAt,
         sections = p.Sections.OrderBy(s => s.Order).Select(s => new
         {
@@ -361,7 +363,7 @@ public record SongPayload(string Title, string? Artist, int? DurationSeconds, st
     string? PraiseChartsSlug, string? PraiseChartsThumbnailUrl, string? Notes);
 public record ServiceTypePayload(string Name, List<ServiceTypeSectionDef> Sections);
 public record ServiceTypeSectionDef(string Title, int Order);
-public record PlanPayload(int ServiceTypeId, string Date, List<PlanSectionPayload> Sections);
+public record PlanPayload(int ServiceTypeId, string Date, List<PlanSectionPayload> Sections, string? StartTime = null);
 public record PlanSectionPayload(int Id, string Title, List<PlanItemPayload> Items);
 public record PlanItemPayload(int Id, int? SongId, string? EventTitle, string? LeaderName, int? DurationSeconds);
 
