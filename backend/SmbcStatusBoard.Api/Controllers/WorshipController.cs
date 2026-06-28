@@ -154,7 +154,22 @@ public class WorshipController(AppDbContext db, IConfiguration config) : Control
     public async Task<IActionResult> GetServiceTypes()
     {
         if (!CanWorship()) return Forbid();
-        var types = await db.WorshipServiceTypes.OrderBy(t => t.Name).ToListAsync();
+        var types = await db.WorshipServiceTypes.OrderBy(t => t.CreatedAt).ToListAsync();
+        if (types.Count == 0)
+        {
+            var defaultSections = new List<ServiceTypeSectionDef>
+            {
+                new("Pre-Service", 0), new("Worship", 1), new("Message", 2), new("Closing", 3)
+            };
+            var mainService = new WorshipServiceType
+            {
+                Name = "Main Service",
+                SectionsJson = JsonSerializer.Serialize(defaultSections)
+            };
+            db.WorshipServiceTypes.Add(mainService);
+            await db.SaveChangesAsync();
+            types = [mainService];
+        }
         return Ok(types.Select(t => new { t.Id, t.Name, sections = JsonSerializer.Deserialize<object>(t.SectionsJson) }));
     }
 
