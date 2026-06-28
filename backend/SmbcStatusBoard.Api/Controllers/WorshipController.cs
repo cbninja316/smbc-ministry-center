@@ -157,10 +157,7 @@ public class WorshipController(AppDbContext db, IConfiguration config) : Control
         var types = await db.WorshipServiceTypes.OrderBy(t => t.CreatedAt).ToListAsync();
         if (types.Count == 0)
         {
-            var defaultSections = new List<ServiceTypeSectionDef>
-            {
-                new("Pre-Service", 0), new("Worship", 1), new("Message", 2), new("Closing", 3)
-            };
+            var defaultSections = new List<ServiceTypeSectionDef> { new("Worship", 0) };
             var mainService = new WorshipServiceType
             {
                 Name = "Main Service",
