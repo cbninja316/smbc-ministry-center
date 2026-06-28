@@ -80,6 +80,9 @@ public class WorshipController(AppDbContext db, IConfiguration config) : Control
         if (!CanWorship()) return Forbid();
         var song = await db.WorshipSongs.FindAsync(id);
         if (song == null) return NotFound();
+        // Remove plan items that reference this song
+        var planItems = await db.WorshipPlanItems.Where(i => i.SongId == id).ToListAsync();
+        db.WorshipPlanItems.RemoveRange(planItems);
         // Remove uploaded files
         var files = JsonSerializer.Deserialize<List<WorshipFileEntry>>(song.FilesJson) ?? [];
         foreach (var f in files)
