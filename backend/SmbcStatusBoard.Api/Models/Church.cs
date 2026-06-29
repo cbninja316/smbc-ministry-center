@@ -8,5 +8,8 @@ public class Church
     public string? Slug { get; set; }            // url-friendly identifier (future subdomain use)
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public string Status { get; set; } = "Pending"; // Pending | Approved | Denied
+    public string? DeniedReason { get; set; }
+
     public ICollection<User> Users { get; set; } = new List<User>();
 }

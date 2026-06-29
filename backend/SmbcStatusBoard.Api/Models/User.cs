@@ -1,6 +1,6 @@
 namespace SmbcStatusBoard.Api.Models;
 
-public enum UserRole { Member, Admin, SuperAdmin }
+public enum UserRole { Member, Admin, SuperAdmin, Developer }
 public enum MembershipStatus { NotAMember, Member }
 public enum JoinedBy { TransferByLetter, AcceptedChrist, StatementOfFaith }
 public enum Gender { Male, Female }

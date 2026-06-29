@@ -233,6 +233,9 @@ public class GivingController(AppDbContext db) : ControllerBase
     [HttpPost("payment-intent")]
     public async Task<IActionResult> CreatePaymentIntent([FromBody] PaymentIntentRequest req)
     {
+        if (User.FindFirstValue("DevSession") == "true")
+            return Forbid(); // developer impersonation sessions cannot make payments
+
         if (req.Amount <= 0)
             return BadRequest(new { message = "Amount must be greater than zero." });
 

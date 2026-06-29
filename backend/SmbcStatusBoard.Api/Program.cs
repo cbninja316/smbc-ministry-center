@@ -64,7 +64,10 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-    await SeedSuperAdminAsync(db, builder.Configuration);
+    await SeedDeveloperAsync(db, builder.Configuration);
+    var users = await db.Users.ToListAsync();
+    foreach (var u in users)
+        Console.WriteLine($"[SEED CHECK] Id={u.Id} Username={u.Username} Role={u.Role} IsActive={u.IsActive} EmailVerified={u.EmailVerified}");
 }
 
 app.UseCors();
@@ -74,22 +77,27 @@ app.MapControllers();
 
 app.Run();
 
-static async Task SeedSuperAdminAsync(AppDbContext db, IConfiguration config)
+static async Task SeedDeveloperAsync(AppDbContext db, IConfiguration config)
 {
-    if (await db.Users.AnyAsync()) return;
+    var username = config["Seed:DeveloperUsername"];
+    var password = config["Seed:DeveloperPassword"];
+    var email = config["Seed:DeveloperEmail"];
 
-    var username = config["Seed:SuperAdminUsername"] ?? "admin";
-    var password = config["Seed:SuperAdminPassword"] ?? "ChangeMe123!";
-    var email = config["Seed:SuperAdminEmail"] ?? "admin@church.org";
+    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(email))
+        return;
+
+    var exists = await db.Users.AnyAsync(u => u.Username == username);
+    if (exists) return;
 
     db.Users.Add(new SmbcStatusBoard.Api.Models.User
     {
         Username = username,
         Email = email,
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-        Role = SmbcStatusBoard.Api.Models.UserRole.SuperAdmin,
+        Role = SmbcStatusBoard.Api.Models.UserRole.Developer,
         IsActive = true,
-        AllowedItemTypes = "ChurchEvent,FacilityUse,Benevolence,Maintenance,Receipt"
+        EmailVerified = true,
+        AllowedItemTypes = ""
     });
 
     await db.SaveChangesAsync();

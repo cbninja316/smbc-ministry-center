@@ -101,6 +101,7 @@ public class ChurchController(AppDbContext db, TokenService tokenService, EmailS
             Name = req.ChurchName.Trim(),
             Slug = slug,
             LogoData = string.IsNullOrEmpty(req.LogoData) ? null : req.LogoData,
+            Status = "Pending",
         };
         db.Churches.Add(church);
         await db.SaveChangesAsync();
