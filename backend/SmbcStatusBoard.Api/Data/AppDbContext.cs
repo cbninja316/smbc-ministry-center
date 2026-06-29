@@ -42,6 +42,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<WorshipPlan> WorshipPlans => Set<WorshipPlan>();
     public DbSet<WorshipPlanSection> WorshipPlanSections => Set<WorshipPlanSection>();
     public DbSet<WorshipPlanItem> WorshipPlanItems => Set<WorshipPlanItem>();
+    public DbSet<TwilioSettings> TwilioSettings => Set<TwilioSettings>();
+    public DbSet<SmsMessage> SmsMessages => Set<SmsMessage>();
+    public DbSet<ScheduledSms> ScheduledSms => Set<ScheduledSms>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -353,5 +356,39 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<UserPreference>()
             .HasIndex(p => new { p.UserId, p.Key })
             .IsUnique();
+
+        modelBuilder.Entity<TwilioSettings>()
+            .HasOne(t => t.Church)
+            .WithMany()
+            .HasForeignKey(t => t.ChurchId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TwilioSettings>()
+            .HasIndex(t => t.ChurchId)
+            .IsUnique();
+
+        modelBuilder.Entity<SmsMessage>()
+            .HasOne(s => s.Church)
+            .WithMany()
+            .HasForeignKey(s => s.ChurchId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SmsMessage>()
+            .HasOne(s => s.User)
+            .WithMany()
+            .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ScheduledSms>()
+            .HasOne(s => s.Church)
+            .WithMany()
+            .HasForeignKey(s => s.ChurchId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ScheduledSms>()
+            .HasOne(s => s.User)
+            .WithMany()
+            .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

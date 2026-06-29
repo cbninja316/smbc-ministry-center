@@ -31,6 +31,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<FileStorageService>();
 builder.Services.AddScoped<PraiseChartsService>();
+builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("PraiseCharts", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
