@@ -150,7 +150,7 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
             await emailService.SendNewRequestAsync(
                 recipients.Select(r => (r.Email, r.Username)).ToList(),
                 typeLabel,
-                details);
+                details, churchId: null);
         }
         catch (Exception ex)
         {
@@ -193,7 +193,7 @@ public class PublicController(AppDbContext db, FileStorageService storage, Email
                 assignment.User.Username,
                 assignment.Role.Label,
                 assignment.SundayDate.ToString("MMMM d, yyyy"),
-                accepted);
+                accepted, assignment.User.ChurchId);
         }
         catch (Exception ex)
         {

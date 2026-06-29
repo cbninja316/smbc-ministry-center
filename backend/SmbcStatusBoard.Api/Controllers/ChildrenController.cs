@@ -196,7 +196,7 @@ public class ChildrenController(AppDbContext db, EmailService emailService, ICon
 
         var siteUrl = config["App:NextFrontendUrl"] ?? config["App:SiteUrl"] ?? config["App:FrontendUrl"];
         var inviteLink = $"{siteUrl}/setup-password?token={token}";
-        await emailService.SendInviteAsync(user.Email, user.Username, inviteLink);
+        await emailService.SendInviteAsync(user.Email, user.Username, inviteLink, user.ChurchId);
 
         return Ok(new { message = "Invite sent.", userId = user.Id, username });
     }

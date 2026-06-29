@@ -2,14 +2,43 @@ using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using MailKit.Net.Smtp;
 using MimeKit;
+using SmbcStatusBoard.Api.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace SmbcStatusBoard.Api.Services;
 
-public class EmailService(IConfiguration config)
+public class EmailService(IConfiguration config, AppDbContext db)
 {
-    public async Task SendNewRequestAsync(List<(string Email, string Name)> recipients, string typeLabel, List<(string Label, string Value)> details)
+    private async Task<string> GetChurchNameAsync(int? churchId)
+    {
+        if (churchId == null) return config["Email:FromName"] ?? "One Accord";
+        var name = await db.Churches.Where(c => c.Id == churchId).Select(c => c.Name).FirstOrDefaultAsync();
+        return name ?? config["Email:FromName"] ?? "One Accord";
+    }
+
+    private MailboxAddress FromAddress(string churchName) =>
+        new(churchName, config["Email:FromAddress"] ?? "admin@church.org");
+
+    private async Task<SmtpClient> ConnectAsync()
+    {
+        var client = new SmtpClient();
+        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
+        {
+            if (errors == SslPolicyErrors.None) return true;
+            if (chain == null) return false;
+            return chain.ChainStatus.All(s =>
+                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
+                s.Status == X509ChainStatusFlags.OfflineRevocation);
+        };
+        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
+        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        return client;
+    }
+
+    public async Task SendNewRequestAsync(List<(string Email, string Name)> recipients, string typeLabel, List<(string Label, string Value)> details, int? churchId = null)
     {
         if (recipients.Count == 0) return;
+        var churchName = await GetChurchNameAsync(churchId);
 
         var rows = string.Join("", details
             .Where(d => !string.IsNullOrWhiteSpace(d.Value))
@@ -34,51 +63,40 @@ public class EmailService(IConfiguration config)
                     {rows}
                   </table>
                   <p style="margin:20px 0 0;color:#9ca3af;font-size:0.8rem;">
-                    Log in to One Accord to view and manage this request.
+                    Log in to {System.Net.WebUtility.HtmlEncode(churchName)} to view and manage this request.
                   </p>
                 </div>
               </div>
             </div>
             """;
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
-
+        using var client = await ConnectAsync();
         foreach (var (email, name) in recipients)
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+            message.From.Add(FromAddress(churchName));
             message.To.Add(new MailboxAddress(name, email));
             message.Subject = $"New {typeLabel} Submitted";
             message.Body = new TextPart("html") { Text = html };
             await client.SendAsync(message);
         }
-
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendPasswordResetAsync(string toEmail, string toName, string resetLink)
+    public async Task SendPasswordResetAsync(string toEmail, string toName, string resetLink, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = "Reset Your One Accord Password";
+        message.Subject = $"Reset Your {churchName} Password";
 
         message.Body = new TextPart("html")
         {
             Text = $"""
                 <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
                   <h2 style="color: #005DBA;">Reset Your Password</h2>
-                  <p>We received a request to reset the password for your One Accord account (<strong>{System.Net.WebUtility.HtmlEncode(toName)}</strong>).</p>
+                  <p>We received a request to reset the password for your {System.Net.WebUtility.HtmlEncode(churchName)} account (<strong>{System.Net.WebUtility.HtmlEncode(toName)}</strong>).</p>
                   <p>Click the button below to choose a new password. This link expires in 1 hour.</p>
                   <a href="{resetLink}" style="display:inline-block;padding:12px 24px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Reset My Password</a>
                   <p style="color:#888;font-size:12px;margin-top:24px;">If you did not request a password reset, you can safely ignore this email.</p>
@@ -86,24 +104,15 @@ public class EmailService(IConfiguration config)
                 """
         };
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendVolunteerRequestAsync(string recipientEmail, string recipientName, string roleLabel, string roleDescription, string sundayDate, string acceptUrl, string rejectUrl, List<(string Time, string Label)>? timeSlots = null)
+    public async Task SendVolunteerRequestAsync(string recipientEmail, string recipientName, string roleLabel, string roleDescription, string sundayDate, string acceptUrl, string rejectUrl, List<(string Time, string Label)>? timeSlots = null, int? churchId = null)
     {
-        // Build optional schedule section
+        var churchName = await GetChurchNameAsync(churchId);
+
         var scheduleHtml = "";
         if (timeSlots != null && timeSlots.Count > 0)
         {
@@ -129,7 +138,7 @@ public class EmailService(IConfiguration config)
                 </div>
                 <div style="padding:24px 28px;">
                   <p style="margin:0 0 12px;color:#111827;">Hi <strong>{System.Net.WebUtility.HtmlEncode(recipientName)}</strong>,</p>
-                  <p style="margin:0 0 16px;color:#374151;">You have been requested to serve in the following role:</p>
+                  <p style="margin:0 0 16px;color:#374151;">You have been requested to serve in the following role at {System.Net.WebUtility.HtmlEncode(churchName)}:</p>
                   <table style="width:100%;border-collapse:collapse;font-size:0.9rem;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:8px;">
                     <tr>
                       <td style="padding:8px 12px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">Role</td>
@@ -155,19 +164,9 @@ public class EmailService(IConfiguration config)
             </div>
             """;
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        using var client = await ConnectAsync();
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(recipientName, recipientEmail));
         message.Subject = $"Volunteer Request: {roleLabel} on {sundayDate}";
         message.Body = new TextPart("html") { Text = html };
@@ -175,8 +174,9 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendVolunteerCancellationAsync(string recipientEmail, string recipientName, string roleLabel, string sundayDate)
+    public async Task SendVolunteerCancellationAsync(string recipientEmail, string recipientName, string roleLabel, string sundayDate, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var html = $"""
             <div style="font-family:sans-serif;max-width:560px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
               <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
@@ -196,25 +196,15 @@ public class EmailService(IConfiguration config)
                       <td style="padding:8px 12px;color:#111827;">{System.Net.WebUtility.HtmlEncode(sundayDate)}</td>
                     </tr>
                   </table>
-                  <p style="margin:0;color:#6b7280;font-size:0.85rem;">If you have any questions, please contact your church coordinator.</p>
+                  <p style="margin:0;color:#6b7280;font-size:0.85rem;">If you have any questions, please contact your {System.Net.WebUtility.HtmlEncode(churchName)} coordinator.</p>
                 </div>
               </div>
             </div>
             """;
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        using var client = await ConnectAsync();
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(recipientName, recipientEmail));
         message.Subject = $"Volunteer Request Cancelled: {roleLabel} on {sundayDate}";
         message.Body = new TextPart("html") { Text = html };
@@ -222,9 +212,10 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendVolunteerResponseAsync(List<(string Email, string Name)> recipients, string volunteerName, string roleLabel, string sundayDate, bool accepted)
+    public async Task SendVolunteerResponseAsync(List<(string Email, string Name)> recipients, string volunteerName, string roleLabel, string sundayDate, bool accepted, int? churchId = null)
     {
         if (recipients.Count == 0) return;
+        var churchName = await GetChurchNameAsync(churchId);
         var verb = accepted ? "accepted" : "rejected";
         var html = $"""
             <div style="font-family:sans-serif;max-width:560px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
@@ -236,28 +227,17 @@ public class EmailService(IConfiguration config)
                   <p style="margin:0 0 12px;color:#111827;">
                     <strong>{System.Net.WebUtility.HtmlEncode(volunteerName)}</strong> has <strong>{verb}</strong> the <strong>{System.Net.WebUtility.HtmlEncode(roleLabel)}</strong> volunteer role for {System.Net.WebUtility.HtmlEncode(sundayDate)}.
                   </p>
-                  <p style="margin:16px 0 0;color:#9ca3af;font-size:0.8rem;">Log in to One Accord to manage volunteer assignments.</p>
+                  <p style="margin:16px 0 0;color:#9ca3af;font-size:0.8rem;">Log in to {System.Net.WebUtility.HtmlEncode(churchName)} to manage volunteer assignments.</p>
                 </div>
               </div>
             </div>
             """;
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
-
+        using var client = await ConnectAsync();
         foreach (var (email, name) in recipients)
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+            message.From.Add(FromAddress(churchName));
             message.To.Add(new MailboxAddress(name, email));
             message.Subject = $"{volunteerName} {verb} volunteer role: {roleLabel}";
             message.Body = new TextPart("html") { Text = html };
@@ -266,8 +246,9 @@ public class EmailService(IConfiguration config)
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendItemCompletedAsync(string toEmail, string toName, string typeLabel, List<(string Label, string Value)> details, string? completionNote = null)
+    public async Task SendItemCompletedAsync(string toEmail, string toName, string typeLabel, List<(string Label, string Value)> details, string? completionNote = null, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var rows = string.Join("", details
             .Where(d => !string.IsNullOrWhiteSpace(d.Value))
             .Select(d => $"""
@@ -298,7 +279,7 @@ public class EmailService(IConfiguration config)
                     {rows}
                   </table>
                   <p style="margin:20px 0 0;color:#9ca3af;font-size:0.8rem;">
-                    If you have any questions, please contact the church office.
+                    If you have any questions, please contact the {System.Net.WebUtility.HtmlEncode(churchName)} office.
                   </p>
                 </div>
               </div>
@@ -306,38 +287,29 @@ public class EmailService(IConfiguration config)
             """;
 
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
         message.Subject = $"Your {typeLabel} Has Been Completed";
         message.Body = new TextPart("html") { Text = html };
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendInviteAsync(string toEmail, string toName, string inviteLink)
+    public async Task SendInviteAsync(string toEmail, string toName, string inviteLink, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = "You've been invited to One Accord";
+        message.Subject = $"You've been invited to {churchName}";
 
         message.Body = new TextPart("html")
         {
             Text = $"""
                 <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
-                  <h2 style="color: #005DBA;">Welcome to One Accord</h2>
+                  <h2 style="color: #005DBA;">Welcome to {System.Net.WebUtility.HtmlEncode(churchName)}</h2>
                   <p>You've been added as an administrator. Click the button below to set your password and get started.</p>
                   <a href="{inviteLink}" style="display:inline-block;padding:12px 24px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Set My Password</a>
                   <p style="color:#888;font-size:12px;margin-top:24px;">This link expires in 48 hours.</p>
@@ -345,28 +317,18 @@ public class EmailService(IConfiguration config)
                 """
         };
 
-        using var client = new SmtpClient();
-        // Allow certs where the only issue is an incomplete revocation check (common with HostGator)
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"] ?? throw new InvalidOperationException("Email:Host not configured"), int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"] ?? throw new InvalidOperationException("Email:Username not configured"), config["Email:Password"] ?? throw new InvalidOperationException("Email:Password not configured"));
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendEmailVerificationAsync(string toEmail, string toName, string verifyLink)
+    public async Task SendEmailVerificationAsync(string toEmail, string toName, string verifyLink, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = "Verify your One Accord account";
+        message.Subject = $"Verify your {churchName} account";
 
         message.Body = new TextPart("html")
         {
@@ -374,7 +336,7 @@ public class EmailService(IConfiguration config)
                 <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#f9fafb;padding:24px;border-radius:12px;">
                   <div style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
                     <div style="background:#005DBA;padding:20px 28px;">
-                      <h2 style="margin:0;color:#fff;font-size:1.2rem;">Welcome to One Accord!</h2>
+                      <h2 style="margin:0;color:#fff;font-size:1.2rem;">Welcome to {System.Net.WebUtility.HtmlEncode(churchName)}!</h2>
                     </div>
                     <div style="padding:24px 28px;">
                       <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
@@ -387,27 +349,18 @@ public class EmailService(IConfiguration config)
                 """
         };
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendRolePromotionAsync(string toEmail, string toName, string newRole, string loginUrl)
+    public async Task SendRolePromotionAsync(string toEmail, string toName, string newRole, string loginUrl, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = "Your One Accord role has been updated";
+        message.Subject = $"Your {churchName} role has been updated";
 
         message.Body = new TextPart("html")
         {
@@ -419,7 +372,7 @@ public class EmailService(IConfiguration config)
                     </div>
                     <div style="padding:24px 28px;">
                       <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
-                      <p style="margin:0 0 20px;color:#374151;">Your account has been updated to <strong>{System.Net.WebUtility.HtmlEncode(newRole)}</strong>. You now have additional access in One Accord.</p>
+                      <p style="margin:0 0 20px;color:#374151;">Your account has been updated to <strong>{System.Net.WebUtility.HtmlEncode(newRole)}</strong>. You now have additional access in {System.Net.WebUtility.HtmlEncode(churchName)}.</p>
                       <a href="{loginUrl}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">Log In</a>
                     </div>
                   </div>
@@ -427,25 +380,16 @@ public class EmailService(IConfiguration config)
                 """
         };
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendClassInviteAsync(string toEmail, string toName, string className, string joinLink)
+    public async Task SendClassInviteAsync(string toEmail, string toName, string className, string joinLink, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
         message.Subject = $"You've been invited to join {className}";
 
@@ -459,7 +403,7 @@ public class EmailService(IConfiguration config)
                     </div>
                     <div style="padding:24px 28px;">
                       <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
-                      <p style="margin:0 0 20px;color:#374151;">You've been invited to join <strong>{System.Net.WebUtility.HtmlEncode(className)}</strong> at South Moore Baptist Church. Click below to create your account and join the class.</p>
+                      <p style="margin:0 0 20px;color:#374151;">You've been invited to join <strong>{System.Net.WebUtility.HtmlEncode(className)}</strong> at {System.Net.WebUtility.HtmlEncode(churchName)}. Click below to create your account and join the class.</p>
                       <a href="{joinLink}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">Join Class</a>
                       <p style="margin:16px 0 0;color:#6b7280;font-size:0.85rem;">This invitation expires in 7 days. If you weren't expecting this email, you can ignore it.</p>
                     </div>
@@ -468,25 +412,16 @@ public class EmailService(IConfiguration config)
                 """
         };
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendClassAddedNotificationAsync(string toEmail, string toName, string className, string loginUrl)
+    public async Task SendClassAddedNotificationAsync(string toEmail, string toName, string className, string loginUrl, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
         message.Subject = $"You've been added to {className}";
 
@@ -500,35 +435,26 @@ public class EmailService(IConfiguration config)
                     </div>
                     <div style="padding:24px 28px;">
                       <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
-                      <p style="margin:0 0 20px;color:#374151;">You've been added to <strong>{System.Net.WebUtility.HtmlEncode(className)}</strong> at South Moore Baptist Church.</p>
-                      <a href="{loginUrl}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">View in One Accord</a>
+                      <p style="margin:0 0 20px;color:#374151;">You've been added to <strong>{System.Net.WebUtility.HtmlEncode(className)}</strong> at {System.Net.WebUtility.HtmlEncode(churchName)}.</p>
+                      <a href="{loginUrl}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">View in {System.Net.WebUtility.HtmlEncode(churchName)}</a>
                     </div>
                   </div>
                 </div>
                 """
         };
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
 
-    public async Task SendSpouseInviteAsync(string toEmail, string toName, string inviterName, string newUsername, string joinLink)
+    public async Task SendSpouseInviteAsync(string toEmail, string toName, string inviterName, string newUsername, string joinLink, int? churchId = null)
     {
+        var churchName = await GetChurchNameAsync(churchId);
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+        message.From.Add(FromAddress(churchName));
         message.To.Add(new MailboxAddress(toName, toEmail));
-        message.Subject = $"{System.Net.WebUtility.HtmlEncode(inviterName)} added you as their spouse on One Accord";
+        message.Subject = $"{inviterName} added you as their spouse on {churchName}";
 
         message.Body = new TextPart("html")
         {
@@ -540,7 +466,7 @@ public class EmailService(IConfiguration config)
                     </div>
                     <div style="padding:24px 28px;">
                       <p style="margin:0 0 8px;color:#111827;">Hi {System.Net.WebUtility.HtmlEncode(toName)},</p>
-                      <p style="margin:0 0 16px;color:#374151;"><strong>{System.Net.WebUtility.HtmlEncode(inviterName)}</strong> has added you as their spouse on One Accord, the South Moore Baptist Church member portal. Click below to set your password and get started.</p>
+                      <p style="margin:0 0 16px;color:#374151;"><strong>{System.Net.WebUtility.HtmlEncode(inviterName)}</strong> has added you as their spouse on {System.Net.WebUtility.HtmlEncode(churchName)}. Click below to set your password and get started.</p>
                       <p style="margin:0 0 20px;color:#374151;">Your username is: <strong>{System.Net.WebUtility.HtmlEncode(newUsername)}</strong></p>
                       <a href="{joinLink}" style="display:inline-block;padding:12px 28px;background:#005DBA;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem;">Create My Account</a>
                       <p style="margin:16px 0 0;color:#6b7280;font-size:0.85rem;">This link expires in 7 days. If you weren't expecting this email, you can safely ignore it.</p>
@@ -550,17 +476,7 @@ public class EmailService(IConfiguration config)
                 """
         };
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
+        using var client = await ConnectAsync();
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
@@ -570,9 +486,11 @@ public class EmailService(IConfiguration config)
         string eventName,
         string? eventDateRange,
         string? location,
-        List<string> registeredNames)
+        List<string> registeredNames,
+        int? churchId = null)
     {
         if (recipients.Count == 0) return;
+        var churchName = await GetChurchNameAsync(churchId);
 
         var nameList = string.Join("", registeredNames.Select(n =>
             $"<li style=\"padding:4px 0;color:#111827;\">{System.Net.WebUtility.HtmlEncode(n)}</li>"));
@@ -600,35 +518,23 @@ public class EmailService(IConfiguration config)
                     {nameList}
                   </ul>
                   <p style="margin:20px 0 0;color:#9ca3af;font-size:0.8rem;">
-                    See you there! Log in to One Accord if you need to make changes.
+                    See you there! Log in to {System.Net.WebUtility.HtmlEncode(churchName)} if you need to make changes.
                   </p>
                 </div>
               </div>
             </div>
             """;
 
-        using var client = new SmtpClient();
-        client.ServerCertificateValidationCallback = (sender, certificate, chain, errors) =>
-        {
-            if (errors == SslPolicyErrors.None) return true;
-            if (chain == null) return false;
-            return chain.ChainStatus.All(s =>
-                s.Status == X509ChainStatusFlags.RevocationStatusUnknown ||
-                s.Status == X509ChainStatusFlags.OfflineRevocation);
-        };
-        await client.ConnectAsync(config["Email:Host"]!, int.Parse(config["Email:Port"] ?? "587"), MailKit.Security.SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(config["Email:Username"]!, config["Email:Password"]!);
-
+        using var client = await ConnectAsync();
         foreach (var (email, name) in recipients)
         {
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "One Accord", config["Email:FromAddress"] ?? "admin@church.org"));
+            message.From.Add(FromAddress(churchName));
             message.To.Add(new MailboxAddress(name, email));
             message.Subject = $"Registration Confirmed: {eventName}";
             message.Body = new TextPart("html") { Text = html };
             await client.SendAsync(message);
         }
-
         await client.DisconnectAsync(true);
     }
 }

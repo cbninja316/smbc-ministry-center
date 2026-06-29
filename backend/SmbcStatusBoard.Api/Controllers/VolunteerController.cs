@@ -164,7 +164,7 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
             await emailService.SendVolunteerRequestAsync(
                 user.Email, user.Username, role.Label, role.Description,
                 assignment.SundayDate.ToString("MMMM d, yyyy"),
-                acceptUrl, rejectUrl, timeSlots);
+                acceptUrl, rejectUrl, timeSlots, user.ChurchId);
         }
         catch (Exception ex)
         {
@@ -205,7 +205,7 @@ public class VolunteerController(AppDbContext db, EmailService emailService, ICo
                 assignment.User.Email,
                 assignment.User.Username,
                 assignment.Role.Label,
-                assignment.SundayDate.ToString("MMMM d, yyyy"));
+                assignment.SundayDate.ToString("MMMM d, yyyy"), assignment.User.ChurchId);
         }
         catch (Exception ex)
         {

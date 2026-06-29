@@ -100,7 +100,7 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         var siteUrl = config["App:NextFrontendUrl"] ?? config["App:SiteUrl"] ?? config["App:FrontendUrl"];
         var inviteLink = $"{siteUrl}/setup-password?token={token}";
 
-        await emailService.SendInviteAsync(user.Email, user.Username, inviteLink);
+        await emailService.SendInviteAsync(user.Email, user.Username, inviteLink, user.ChurchId);
 
         return Ok(new { message = "Invite sent.", userId = user.Id });
     }
@@ -135,7 +135,7 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
             var frontendUrl = config["App:NextFrontendUrl"] ?? "https://oneaccord.southmoorebc.org";
             var displayName = $"{user.FirstName} {user.LastName}".Trim();
             if (string.IsNullOrEmpty(displayName)) displayName = user.Username;
-            await emailService.SendRolePromotionAsync(user.Email, displayName, newRole.ToString(), frontendUrl + "/login");
+            await emailService.SendRolePromotionAsync(user.Email, displayName, newRole.ToString(), frontendUrl + "/login", user.ChurchId);
         }
 
         return Ok(new { message = "Role updated." });

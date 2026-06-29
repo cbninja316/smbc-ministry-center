@@ -197,7 +197,7 @@ public class ServeController(AppDbContext db, EmailService emailService, IConfig
                 assignment.User.Username,
                 assignment.Role.Label,
                 assignment.SundayDate.ToString("MMMM d, yyyy"),
-                accepted);
+                accepted, assignment.User.ChurchId);
         }
         catch (Exception ex)
         {

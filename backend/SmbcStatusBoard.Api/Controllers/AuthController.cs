@@ -95,7 +95,7 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
 
             var frontendUrl = config["App:NextFrontendUrl"] ?? "https://oneaccord.southmoorebc.org";
             var resetLink = $"{frontendUrl}/reset-password?token={token}";
-            await emailService.SendPasswordResetAsync(user.Email, user.Username, resetLink);
+            await emailService.SendPasswordResetAsync(user.Email, user.Username, resetLink, user.ChurchId);
         }
 
         return Ok(new { message = "If that email exists in our system, a reset link has been sent." });
@@ -193,7 +193,7 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         var verifyLink = $"{frontendUrl}/verify-email?token={tokenStr}";
         try
         {
-            await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink);
+            await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink, user.ChurchId);
         }
         catch (Exception ex)
         {
@@ -257,7 +257,7 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
         var verifyLink = $"{frontendUrl}/verify-email?token={tokenStr}";
         try
         {
-            await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink);
+            await emailService.SendEmailVerificationAsync(user.Email, $"{user.FirstName} {user.LastName}", verifyLink, user.ChurchId);
         }
         catch (Exception ex)
         {
