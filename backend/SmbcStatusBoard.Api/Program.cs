@@ -86,8 +86,15 @@ static async Task SeedDeveloperAsync(AppDbContext db, IConfiguration config)
     if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(email))
         return;
 
-    var exists = await db.Users.AnyAsync(u => u.Username == username);
-    if (exists) return;
+    var existing = await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+    if (existing != null)
+    {
+        existing.IsActive = true;
+        existing.EmailVerified = true;
+        existing.Role = SmbcStatusBoard.Api.Models.UserRole.Developer;
+        await db.SaveChangesAsync();
+        return;
+    }
 
     db.Users.Add(new SmbcStatusBoard.Api.Models.User
     {
