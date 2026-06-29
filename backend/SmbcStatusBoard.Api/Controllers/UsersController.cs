@@ -211,6 +211,61 @@ public class UsersController(AppDbContext db, EmailService emailService, IConfig
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
+        // Tokens and session data
+        db.PasswordResetTokens.RemoveRange(db.PasswordResetTokens.Where(t => t.UserId == id));
+        db.EmailVerificationTokens.RemoveRange(db.EmailVerificationTokens.Where(t => t.UserId == id));
+        db.InviteTokens.RemoveRange(db.InviteTokens.Where(t => t.UserId == id));
+        db.UserPreferences.RemoveRange(db.UserPreferences.Where(p => p.UserId == id));
+
+        // Volunteer assignments
+        db.VolunteerAssignments.RemoveRange(db.VolunteerAssignments.Where(a => a.UserId == id));
+
+        // Giving records
+        db.GivingEntries.RemoveRange(db.GivingEntries.Where(g => g.UserId == id));
+
+        // Class membership and attendance
+        db.ClassMembers.RemoveRange(db.ClassMembers.Where(m => m.UserId == id));
+        db.ClassAttendances.RemoveRange(db.ClassAttendances.Where(a => a.UserId == id));
+
+        // Event registrations
+        db.EventRegistrations.RemoveRange(db.EventRegistrations.Where(r => r.UserId == id));
+
+        // SMS
+        db.SmsMessages.RemoveRange(db.SmsMessages.Where(s => s.UserId == id));
+        db.ScheduledSms.RemoveRange(db.ScheduledSms.Where(s => s.UserId == id));
+
+        // Child check-ins (remove check-in records performed by or checked-out by this user)
+        db.ChildCheckIns.RemoveRange(db.ChildCheckIns.Where(ci => ci.CheckedInByUserId == id || ci.CheckedOutByUserId == id));
+
+        // Child link suggestions requested by this user
+        db.ChildLinkSuggestions.RemoveRange(db.ChildLinkSuggestions.Where(s => s.RequestingUserId == id));
+
+        // Null out soft references that should survive account deletion
+        await db.Items
+            .Where(i => i.SubmittedByUserId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.SubmittedByUserId, (int?)null));
+
+        await db.BudgetCategories
+            .Where(c => c.SalaryUserId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.SalaryUserId, (int?)null));
+
+        await db.Children
+            .Where(c => c.ParentUserId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ParentUserId, (int?)null));
+
+        await db.Children
+            .Where(c => c.LinkedUserId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.LinkedUserId, (int?)null));
+
+        await db.Children
+            .Where(c => c.VerifiedByUserId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.VerifiedByUserId, (int?)null));
+
+        // Clear spouse link on the other user
+        await db.Users
+            .Where(u => u.SpouseUserId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.SpouseUserId, (int?)null));
+
         db.Users.Remove(user);
         await db.SaveChangesAsync();
         return NoContent();
