@@ -5,6 +5,7 @@ namespace SmbcStatusBoard.Api.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<Church> Churches => Set<Church>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Item> Items => Set<Item>();
     public DbSet<Receipt> Receipts => Set<Receipt>();

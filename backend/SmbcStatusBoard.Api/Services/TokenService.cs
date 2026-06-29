@@ -18,7 +18,8 @@ public class TokenService(IConfiguration config)
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Username),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim("AllowedItemTypes", user.AllowedItemTypes)
+            new Claim("AllowedItemTypes", user.AllowedItemTypes),
+            new Claim("ChurchId", user.ChurchId?.ToString() ?? "")
         };
 
         var token = new JwtSecurityToken(

@@ -173,6 +173,7 @@ public class AuthController(AppDbContext db, TokenService tokenService, EmailSer
             AllowedItemTypes = string.Empty,
             BirthDate = birthDate,
             Gender = gender,
+            ChurchId = req.ChurchId,
         };
 
         db.Users.Add(user);

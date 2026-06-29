@@ -38,6 +38,10 @@ public class User
 
     public string? StripeCustomerId { get; set; }
 
+    // Multi-church
+    public int? ChurchId { get; set; }
+    public Church? Church { get; set; }
+
     // Family
     public int? SpouseUserId { get; set; }
     public User? Spouse { get; set; }
